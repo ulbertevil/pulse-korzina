@@ -94,13 +94,22 @@ def store_labels(stores: pd.DataFrame) -> pd.Series:
     return pd.Series(lab.to_numpy(), index=stores["store_id"].to_numpy())
 
 
+def demo_labels(stores: pd.DataFrame) -> pd.Series:
+    """Для демо-выгрузки: «Город, магазин 1a2b3c» — без адресов, чтобы синтетика не приписывалась реальным магазинам."""
+    sid = stores["store_id"].astype(str)
+    lab = stores["city"] + ", магазин " + sid.str[:6]
+    dup = lab.duplicated(keep=False)
+    lab[dup] = stores.loc[dup, "city"] + ", магазин " + sid[dup]
+    return pd.Series(lab.to_numpy(), index=sid.to_numpy())
+
+
 def demo_export(hourly: pd.DataFrame, stores: pd.DataFrame) -> pd.DataFrame:
-    """Синтетика в формате выгрузки: строка на магазин и день."""
+    """Синтетика в формате выгрузки: строка на магазин и день; вместо адресов — коды магазинов."""
     g = hourly.groupby(["store_id", "date"]).agg(
         start=("hour", "min"), end=("hour", "max"), volunteers=("volunteers", "mean"), kg=("kg", "sum")).reset_index()
     g["end"] += 1
     g = g.merge(stores[["store_id", "city", "region", "chain"]], on="store_id")
-    g["store_id"] = g["store_id"].map(store_labels(stores))
+    g["store_id"] = g["store_id"].map(demo_labels(stores))
     g["volunteers"] = g["volunteers"].round(2)
     g["kg"] = g["kg"].round(2)
     return g.rename(columns={"store_id": "магазин", "city": "город", "region": "регион", "chain": "сеть",

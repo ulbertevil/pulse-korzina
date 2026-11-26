@@ -280,8 +280,8 @@ function renderReality(R, F) {
     { title: "Недобор к идеалу", num: true, render: (r) => pct(r.regret, 1) },
   ], R.volunteers);
   const worst = Math.max(...R.volunteers.map((r) => r.regret));
-  $("robust-note").textContent = "Рекомендация не делает хуже ни в одном сценарии: при нулевом эффекте она равна ноябрьской, "
-    + `при любом другом — лучше. «Недобор к идеалу» — сколько теряем против расстановки, которая знала бы настоящий эффект: не больше ${pct(worst, 1)}. `
+  $("robust-note").textContent = "В проверенных сценариях (эффект от нуля до вдвое больше оценки, та же форма модели) рекомендация не хуже ноябрьской: "
+    + `при нулевом эффекте она равна ей. Прогноз при нынешних людях во всех сценариях один — он привязан к цифре фонда. «Недобор к идеалу» — сколько теряем против расстановки, которая знала бы настоящий эффект: не больше ${pct(worst, 1)}. `
     + "Если эффект намного больше оценки (×4 и выше), людей выгоднее концентрировать сильнее — это проверит A/B-эксперимент.";
 
   table($("stress-table"), [
@@ -294,30 +294,42 @@ function renderReality(R, F) {
   $("stress-note").textContent = `Разброс — типичное отличие магазина или региона от среднего. Даже при регионах, различающихся в ${fmt(Math.exp(last.sigma_region), 1)} раза `
     + `(примерно как в публичных цифрах), модель ошибается на ${pct(last.gain_vs_naive, 0)} меньше, чем «как в прошлый раз».`;
 
-  if (F) $("prereg-text").textContent = `Сбор по сети ${tons(F.pred)}: с вероятностью 80% от ${tons(F.lo80)} до ${tons(F.hi80)}, 95% — от ${tons(F.lo95)} до ${tons(F.hi95)}. `
-    + `Это ${fmt(F.pred / F.stores)} кг на магазин при ${fmt(F.stores)} магазинах. Проверяем сумму по сети: разбивка по городам ненадёжна (см. выше).`;
+  $("prereg").hidden = !F;
+  if (!F) return;
+  $("prereg-title").textContent = `Прогноз на ${datesLabel(F.dates)} зафиксирован ${dateLabel(F.made)}, до акции`;
+  $("prereg-text").textContent = `Сбор по сети ${tons(F.pred_kg)}: 80% диапазон модели — от ${tons(F.lo80_kg)} до ${tons(F.hi80_kg)}, 95% — от ${tons(F.lo95_kg)} до ${tons(F.hi95_kg)}. `
+    + `Это ${fmt(F.pred_kg / F.stores)} кг на магазин при ${fmt(F.stores)} магазинах. Проверяем сумму по сети и кг на магазин: разбивка по городам ненадёжна (см. выше). `
+    + `Числа берутся из файла ${F.stores_csv.replace(/_stores\.csv$/, ".json")}, а не из пересборки; SHA-256 прогноза по магазинам начинается с ${F.stores_csv_sha256.slice(0, 16)}, тег в git — ${F.git_tag}.`;
 }
 
 function render(D) {
   const k = D.kpi, M = D.meta;
   $("src-table").href = M.source_table;
-  $("next-title").textContent = `Следующая акция: ${datesLabel(M.dates)}`;
+  if (!M.table_connected) $("banner-hours").textContent = `; таблицы на ${datesLabel(M.dates)} ещё нет — взяты ноябрьские магазины и часы`;
+  const demo = (name) => (M.synthetic ? "ДЕМО_" : "") + name;
+  [["dl-cities", "расстановка_по_городам.csv"], ["dl-slots", "расстановка_по_точкам.csv"], ["dl-assign", "тест_контроль.csv"]]
+    .forEach(([id, name]) => $(id).setAttribute("download", demo(name)));
+  const past = new Date() > new Date(M.dates[M.dates.length - 1] + "T23:59:59");
+  $("next-title").textContent = past ? `Акция ${datesLabel(M.dates)} прошла — ниже прогноз, сделанный до неё` : `Следующая акция: ${datesLabel(M.dates)}`;
   $("next-date").value = M.dates[0];
   $("kpi-tons").textContent = tons(k.pred_kg);
-  $("kpi-range").textContent = `в 8 случаях из 10 — от ${tons(k.lo80)} до ${tons(k.hi80)}; почти наверняка — от ${tons(k.lo95)} до ${tons(k.hi95)}`;
+  $("kpi-range").textContent = `80% диапазон модели — от ${tons(k.lo80)} до ${tons(k.hi80)}, 95% — от ${tons(k.lo95)} до ${tons(k.hi95)}. `
+    + "Это разброс ошибок на прошлых акциях синтетики; ошибки в допущениях (сезон, рост, число магазинов) в него не входят.";
   $("kpi-stores").textContent = fmt(M.stores);
   $("kpi-geo").textContent = `${fmt(M.cities)} городов, ${fmt(M.regions)} регионов`;
   $("kpi-shifts").textContent = fmt(k.shifts);
-  $("kpi-shift-gain").textContent = `При рекомендуемой расстановке ${signedPct(k.uplift_vs_current)} кг к «как в ноябре»`;
-  const extra = k.kg_opt - k.kg_current, sets = extra / 6;
+  $("kpi-shift-gain").textContent = `При рекомендуемой расстановке ${signedPct(k.uplift_vs_uniform)}…${signedPct(k.uplift_vs_current)} кг: к раскладу «поровну» и к смоделированному ноябрю`;
+  const extra = k.kg_opt - k.kg_current, extraUni = k.kg_opt - k.kg_opt / (1 + k.uplift_vs_uniform);
+  const r10 = (x) => Math.round(x / 6 / 10) * 10, hiSets = r10(extra);
   $("kpi-gain").replaceChildren(
-    el("strong", { text: `+${fmt(Math.round(sets / 10) * 10)} ${plural(Math.round(sets / 10) * 10, "набор", "набора", "наборов")} без новых волонтёров. ` }),
-    `Те же ${fmt(k.shifts)} смен, поставленные туда, где они дают больше, — это ещё ≈ ${tons(extra)}. `,
+    el("strong", { text: `От +${fmt(r10(extraUni))} до +${fmt(hiSets)} ${plural(hiSets, "набора", "наборов", "наборов")} без новых волонтёров. ` }),
+    `Те же ${fmt(k.shifts)} смен, поставленные туда, где они дают больше: +${tons(extraUni)} к раскладу «поровну» и +${tons(extra)} к ноябрьской расстановке `
+      + "(в демо она смоделирована, реальной у нас нет). ",
     el("span", { class: "muted", text: "Оценка модели на синтетике; эффект волонтёров нужно подтвердить " }),
     el("a", { href: "#ab", text: "экспериментом" }), el("span", { class: "muted", text: "." }));
   const sel = $("portion-select");
   D.portions.forEach((p, i) => sel.append(el("option", { value: i, text: p.label })));
-  const setPortion = () => { const p = D.portions[sel.value]; $("kpi-portions").textContent = fmt(k.pred_kg / p.kg); };
+  const setPortion = () => { const p = D.portions[sel.value]; $("kpi-portions").textContent = "≈ " + fmt(Math.round(k.pred_kg / p.kg / 100) * 100); };
   sel.addEventListener("change", setPortion); setPortion();
   $("generated").textContent = `Данные собраны ${M.generated}.`;
 
@@ -336,7 +348,7 @@ function render(D) {
     D.hourly.map((r) => ({ d: dateShort(r.date), h: `${r.hour}:00`, kg: fmt(r.kg), iv: `${fmt(r.lo80)} – ${fmt(r.hi80)}` })));
 
   // волонтёры
-  $("vol-lede").textContent = `Те же ${fmt(k.shifts)} смен, расставленные по модели, дают ${signedPct(k.uplift_vs_current)} кг к раскладу «как в ноябре» `
+  $("vol-lede").textContent = `Те же ${fmt(k.shifts)} смен, расставленные по модели, дают ${signedPct(k.uplift_vs_current)} кг к раскладу «как в ноябре» (в демо он смоделирован) `
     + `и ${signedPct(k.uplift_vs_uniform)} к раскладу «поровну». Килограммы на смену: ${fmt(k.kg_per_shift_current, 1)} → ${fmt(k.kg_per_shift_opt, 1)}.`;
   table($("cities-table"), [
     { title: "Город", key: "city" }, { title: "Магазинов", key: "stores", num: true }, { title: "Смен", key: "shifts", num: true },
@@ -418,7 +430,7 @@ function render(D) {
       a.textContent = (r.source_url.match(/^https?:\/\/([^/]+)/) || [, r.source_url])[1].replace(/^www\./, ""); return a; } },
   ], D.facts);
   $("dl-facts").href = "data/facts.csv";
-  renderReality(D.reality, { pred: D.kpi.pred_kg, lo80: D.kpi.lo80, hi80: D.kpi.hi80, lo95: D.kpi.lo95, hi95: D.kpi.hi95, stores: D.meta.stores });
+  renderReality(D.reality, D.frozen || null);
   $("app").setAttribute("aria-busy", "false");
 }
 
@@ -473,7 +485,8 @@ fetch("data/dashboard.json")
       `Нашли акций: ${R.actions.length} (${R.actions.map((d) => `${dateLabel(d)} ${d.slice(0, 4)}`).join(", ")}), магазинов: ${fmt(R.stores)}. `
       + "Новая акция начинается после перерыва больше 7 дней." }));
     $("up-tons").textContent = tons(F.kg);
-    $("up-range").textContent = `${dateLabel(F.date)}, ${fmt(F.stores)} магазинов с часами и волонтёрами как в последней акции; 80% — ${tons(F.lo80)}…${tons(F.hi80)}`;
+    $("up-range").textContent = `${dateLabel(F.date)}, ${fmt(F.stores)} магазинов с часами и волонтёрами как в последней акции из файла; 80% — ${tons(F.lo80)}…${tons(F.hi80)}. `
+      + "Прогноз вверху страницы другой: он считается по таблице магазинов следующей акции.";
     if (R.steps.length) {
       const y = R.steps.reduce((a, s) => a + s.net_true, 0);
       const w = (k) => R.steps.reduce((a, s) => a + s[k] * s.net_true, 0) / y;
@@ -529,7 +542,8 @@ fetch("data/dashboard.json")
     if (SHOT) { inline(text, nextDate, handle); return; }
     worker = new Worker("worker.js");
     worker.onmessage = (e) => handle(e.data);
-    worker.onerror = (e) => { say(`Ошибка расчёта: ${e.message}`, true); demoBtn.disabled = false; };
+    // фоновый поток не запустился (старый браузер, политика сайта) — считаем в основном потоке
+    worker.onerror = (e) => { e.preventDefault(); worker.terminate(); worker = null; say("Считаем без фонового потока…"); inline(text, nextDate, handle); };
     worker.postMessage({ text, nextDate });
   }
 
@@ -572,7 +586,7 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
 (function cityPlan() {
   const input = $("city-input"), daySel = $("city-day"), status = $("city-status");
   let rows = [], cities = new Map(), byNorm = new Map(), csvUrl = null, dates = [];
-  let current = null;
+  let current = null, demo = false, tableOk = true;
   const norm = (x) => String(x || "").toLowerCase().replace(/ё/g, "е").replace(/[\s,]+(г|город)\.?$/, "").replace(/\s+/g, " ").trim();
   const resolve = (x) => (cities.has(x) ? x : byNorm.get(norm(x)));
   const store = { get: () => { try { return localStorage.getItem("pulse.city"); } catch { return null; } },
@@ -580,7 +594,7 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
 
   function show(raw, fromUser = true) {
     const city = resolve(raw), all = cities.get(city);
-    if (!all) { $("city-sheet").hidden = true; status.textContent = city ? "Такого города нет в акции — выберите из списка." : ""; return; }
+    if (!all) { $("city-sheet").hidden = true; status.textContent = String(raw || "").trim() ? "Такого города нет в акции — выберите из списка." : ""; return; }
     status.textContent = "";
     if (input.value !== city) input.value = city;
     store.set(city);
@@ -595,7 +609,8 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     $("city-moves").textContent = moved ? `в ${fmt(moved)} из ${fmt(list.length)} точек число людей меняется` : "рекомендация совпадает с ноябрём";
     $("city-kg").textContent = sum("kg_opt") >= 1000 ? tons(sum("kg_opt")) : `${fmt(sum("kg_opt"))} кг`;
     const g = sum("kg_opt") / sum("kg_current") - 1;
-    $("city-gain").textContent = `≈ ${fmt(sum("kg_opt") / 6)} наборов; ${Math.abs(g) < 0.0005 ? "как при ноябрьской расстановке" : signedPct(g) + " к ноябрьской расстановке"}`;
+    const sets = Math.round(sum("kg_opt") / 6);
+    $("city-gain").textContent = `≈ ${fmt(sets)} ${plural(sets, "набор", "набора", "наборов")}; ${Math.abs(g) < 0.0005 ? "как при ноябрьской расстановке" : signedPct(g) + " к ноябрьской расстановке"}`;
     const cols = [
       ...(day ? [] : [{ title: "День", render: (r) => dateShort(r.date) }]),
       { title: "Часы", render: (r) => `${r.start}:00–${r.end}:00` },
@@ -615,7 +630,7 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     const head = ["город", "дата", "начало", "конец", "магазин", "сеть", "людей_было", "людей_надо", "ожидаем_кг", "тара_до_кг"];
     const body = list.map((r) => [city, r.date, r.start, r.end, r.address, r.chain, r.v_current, r.v_opt, r.kg_opt, r.hi80].map(cell).join(","));
     csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
-    const a = $("city-csv"); a.href = csvUrl; a.download = `план_${city.replace(/[^\p{L}\d-]+/gu, "_")}_${day || dates.join("_")}.csv`;
+    const a = $("city-csv"); a.href = csvUrl; a.download = `${demo ? "ДЕМО_" : ""}план_${city.replace(/[^\p{L}\d-]+/gu, "_")}_${day || dates.join("_")}.csv`;
     $("city-sheet").hidden = false;
     current = { city, list, day };
     if (!$("city-msg-box").hidden) $("city-msg").value = message(current);
@@ -626,6 +641,7 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     const need = list.filter((r) => r.v_opt > 0);
     const when = day ? dateLabel(day) : datesLabel(dates);
     const lines = [`«Корзина доброты» · ${city.replace(/\s*г\.?$/, "")} · ${when}`, ""];
+    if (demo) lines.unshift("ДЕМО: люди и килограммы посчитаны на синтетике" + (tableOk ? "" : ", часы — ноябрьские") + ". Не для рассылки.", "");
     if (!need.length) return lines.concat("В этом городе волонтёры на точках не требуются.").join("\n");
     const ns = new Set(need.map((r) => r.address)).size;
     lines.push(`Ищем волонтёров: ${ns} ${plural(ns, "магазин", "магазина", "магазинов")}, ${need.length} ${plural(need.length, "смена", "смены", "смен")}. `
@@ -635,12 +651,15 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
       if (r.date !== prev && !day) { lines.push("", dateShort(r.date)); prev = r.date; }
       lines.push(`• ${r.start}:00–${r.end}:00 — ${r.address} (${r.chain}): ${r.v_opt}`);
     });
+    const free = list.length - need.length;
+    if (free) lines.push("", `Ещё ${free} ${plural(free, "точка", "точки", "точек")} — по плану без волонтёров.`);
     lines.push("", "Откликнитесь координатору — распределим по точкам.");
     return lines.join("\n");
   }
 
   coordData.then((D) => {
     rows = D.rows.map((v) => Object.fromEntries(D.fields.map((f, i) => [f, v[i]])));
+    demo = !!D.synthetic; tableOk = !!D.table_connected;
     dates = D.dates || [...new Set(rows.map((r) => r.date))].sort();
     $("city-when").textContent = datesLabel(dates);
     rows.forEach((r) => { if (!cities.has(r.city)) cities.set(r.city, []); cities.get(r.city).push(r); });
@@ -693,27 +712,31 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     while (lo < hi) { const m = (lo + hi) >> 1; if (c[m] >= need) hi = m; else lo = m + 1; }
     return lo + 1;
   };
-  const t = (kg) => tons(kg, kg >= 100000 ? 1 : 2);
+  const t = (kg) => tons(kg, 1);
   const shiftsTxt = (n) => `${fmt(n)} ${plural(n, "смена", "смены", "смен")}`;
+  const altStart = () => G.kg_opt_alt ?? G.kg_opt;  // осторожный вариант: и перестановка, и новые смены при эффекте × 0,5
 
-  function chart(n, targetMean) {
-    const max = cum.length;
+  function chart(n, nAlt, targetMean) {
+    const all = cum.length;
+    const max = n == null ? all : Math.min(all, Math.max(500, 3 * n, Math.round((nAlt || 0) * 1.15)));
     const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000].find((v) => max / v <= 80) || 2000;
     const xs = []; for (let i = 0; i <= max; i += step) xs.push(i);
     if (xs[xs.length - 1] !== max) xs.push(max);
+    if (n && !xs.includes(n)) { xs.push(n); xs.sort((a, b) => a - b); }
     const lab = niceTicks(0, max, 5).filter((v) => v % step === 0);
-    const key = `${targetMean}`;
+    const key = `${targetMean}|${n}|${max}`;
     if (key === chartKey) return;
     chartKey = key;
     const at = (c, i) => (i === 0 ? 0 : c[i - 1]);
     const s1 = css("--s1"), s2 = css("--s2"), ref = css("--muted");
     const series = [
       { name: "по модели", color: s1, points: xs.map((x) => ({ x, y: G.kg_opt + at(cum, x) })) },
-      { name: "если эффект вдвое меньше", color: s2, points: xs.map((x) => ({ x, y: G.kg_opt + at(cumAlt, x) })) },
+      { name: "если эффект вдвое меньше", color: s2, points: xs.map((x) => ({ x, y: altStart() + at(cumAlt, x) })) },
       { name: "цель с учётом уверенности", color: ref, points: xs.map((x) => ({ x, y: targetMean })) },
     ];
     legend($("goal-legend"), series.map((sr) => ({ name: sr.name, color: sr.color })));
-    const lo = Math.min(G.kg_current, targetMean, G.kg_opt) * 0.97;
+    if (n) series.push({ name: "ваш план", color: s1, dots: true, points: [{ x: n, y: G.kg_opt + at(cum, n) }] });
+    const lo = Math.min(G.kg_current, targetMean, altStart()) * 0.97;
     lineChart($("goal-chart"), { series, xs, yMin: lo, height: 240,
       xTicks: lab, xLabel: (x) => fmt(x), titleFmt: (x) => `+${shiftsTxt(x)}`, yFmt: (v) => fmt(v / 1000) + " т", valFmt: (v) => t(v) });
   }
@@ -725,7 +748,7 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     status.textContent = "";
     const target = goalT * 1000, p = Number(conf.value);
     const mean = target * Math.exp(normPpf(p) * G.sigma);  // ожидание, при котором сумма ≥ цели с вероятностью p
-    const need = mean - G.kg_opt, n = stepsFor(cum, need), nAlt = stepsFor(cumAlt, need);
+    const n = stepsFor(cum, mean - G.kg_opt), nAlt = stepsFor(cumAlt, mean - altStart());
     const max = G.kg_opt + (cum[cum.length - 1] || 0);
     const confTxt = p > 0.5 ? ` в ${p === 0.8 ? "8" : "9"} акциях из 10` : "";
     $("goal-body").hidden = false;
@@ -740,7 +763,8 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
         + "Нужны новые магазины или более длинные часы — или цель поскромнее.";
     } else {
       verdict = `Для цели ${t(target)}${confTxt}: переставить нынешних людей по рекомендации и добавить ${shiftsTxt(n)} — `
-        + `это +${pct(n / G.shifts, 0)} к ${fmt(G.shifts)} сменам ноября.`;
+        + `это +${pct(n / G.shifts, 0)} к ${fmt(G.shifts)} сменам ноября. Перестановка даёт +${tons(G.kg_opt - G.kg_current)}, `
+        + `новые смены — ещё +${tons(cum[n - 1])}.`;
     }
     $("goal-verdict").textContent = verdict;
     const nn = n ?? cum.length;
@@ -749,11 +773,11 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     $("goal-need-sub").textContent = n == null ? "все свободные места на точках — и всё равно мало" : n ? `≈ ${fmt(n / 2, 0)} человек, если каждый выходит оба дня` : "хватит нынешних людей";
     $("goal-kg").textContent = t(G.kg_opt + gain);
     $("goal-kg-sub").textContent = `≈ ${fmt((G.kg_opt + gain) / 6)} наборов` + (gain ? `; из них +${t(gain)} — новые смены` : "");
-    $("goal-alt").textContent = nn ? `+${t(gainAlt)}` : "—";
-    $("goal-alt-sub").textContent = !nn ? "новые смены не нужны"
-      : nAlt == null ? "вместо " + `+${t(gain)}; до цели не хватит даже всех свободных мест`
-      : `вместо +${t(gain)}; для цели понадобится ${shiftsTxt(nAlt)}`;
-    chart(nn, mean);
+    $("goal-alt").textContent = t(altStart() + gainAlt);
+    $("goal-alt-sub").textContent = `вместо ${t(G.kg_opt + gain)}; `
+      + (nAlt == null ? "до цели не хватит даже всех свободных мест на точках"
+        : nAlt === 0 ? "цель достижима и так" : `для цели понадобится ${shiftsTxt(nAlt)}`);
+    chart(n, nAlt, mean);
     // где добавлять
     const add = new Map();
     for (let i = 0; i < nn; i++) { const [ri, g] = G.steps[i]; add.set(ri, (add.get(ri) || { n: 0, kg: 0 })); const a = add.get(ri); a.n += 1; a.kg += g / 10; }
@@ -776,12 +800,12 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
     const body = [...add.entries()].sort((a, b) => a[0] - b[0]).map(([ri, a]) => { const r = rows[ri];
       return [r.city, r.date, r.start, r.end, r.address, r.chain, r.v_opt, r.v_opt + a.n, a.kg.toFixed(1)].map(cell).join(","); });
     csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
-    $("goal-csv").href = csvUrl; $("goal-csv").download = `новые_смены_цель_${goalT}т.csv`;
+    $("goal-csv").href = csvUrl; $("goal-csv").download = `${G.synthetic ? "ДЕМО_" : ""}новые_смены_цель_${goalT}т.csv`;
   }
 
   coordData.then((D) => {
     if (!D.goal) { status.textContent = "Нет данных для цели — пересоберите scripts/build.py."; return; }
-    G = D.goal;
+    G = { ...D.goal, synthetic: !!D.synthetic };
     rows = D.rows.map((v) => Object.fromEntries(D.fields.map((f, i) => [f, v[i]])));
     let a = 0, b = 0;
     cum = G.steps.map((x) => (a += x[1] / 10));

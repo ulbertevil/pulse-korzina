@@ -110,7 +110,9 @@ def main() -> None:
     hourly_plan = allocate.hourly_split(plan, pred_cur, hw, b)
     site = site_export.build(rep, stores_all, hourly_plan, total, alloc, alloc_sum, allocate.city_summary(alloc),
                              res, summ, preds, des, ROOT / "data/facts.csv")
-    site["meta"].update({"regions": int(plan_stores["region"].nunique()), "cities": int(plan_stores["city"].nunique()),
+    # регионы и города в таблице записаны по-разному («Калужская обл.» и «калужская обл.») — считаем без регистра и точек
+    uniq = lambda c: int(plan_stores[c].str.lower().str.replace(".", "", regex=False).str.strip().nunique())  # noqa: E731
+    site["meta"].update({"regions": uniq("region"), "cities": uniq("city"),
                          "table_connected": bool(NEXT.get("table")), "next_source": NEXT.get("source_url")})
     if NEXT.get("table") and "docs.google.com" in NEXT.get("source_url", ""):
         site["meta"]["source_table"] = NEXT["source_url"]
@@ -123,12 +125,16 @@ def main() -> None:
             "stress": stress.round(4).to_dict(orient="records")}
     (rep / "reality.json").write_text(json.dumps(real, ensure_ascii=False, indent=2), encoding="utf-8")
     site["reality"] = real
+    # Прогноз, зафиксированный до акции, показываем из файла, а не из живой сборки
+    frozen = sorted((ROOT / "forecasts").glob("*.json"))
+    if frozen:
+        site["frozen"] = json.loads(frozen[-1].read_text(encoding="utf-8"))
     coord = site_export.coordinator(alloc, per_store, b, sd)
     gl = coord["goal"]
     need = allocate.shifts_for_target(allocate.extra_steps(alloc, b), gl["kg_opt"], 160_000)
     print(f"цель: максимум {(gl['kg_opt'] + sum(x[1] for x in gl['steps']) / 10) / 1000:.1f} т при 3 людях на точке; "
           f"для 160 т в среднем нужно ещё {need} смен")
-    coord.update({"action": A, "dates": sorted(plan["date"].unique().tolist())})
+    coord.update({"action": A, "dates": sorted(plan["date"].unique().tolist()), "table_connected": bool(NEXT.get("table"))})
     (ROOT / "site/data").mkdir(parents=True, exist_ok=True)
     (ROOT / "site/data/coordinator.json").write_text(json.dumps(coord, ensure_ascii=False, separators=(",", ":")),
                                                      encoding="utf-8")

@@ -10,11 +10,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-PORTIONS = [  # data/facts.csv: set_weight_kg, portion_wrap_g, portion_fa_g, portion_tgtg_g
+PORTIONS = [  # data/facts.csv: set_weight_kg; kd_rkk_year_kg / kd_rkk_year_sets (70 т ≈ 17 500 наборов)
     {"id": "sets", "label": "наборов по 6 кг", "kg": 6.0, "fact": "set_weight_kg"},
-    {"id": "wrap", "label": "порций WRAP (420 г)", "kg": 0.42, "fact": "portion_wrap_g"},
-    {"id": "fa", "label": "порций Feeding America (544 г)", "kg": 0.544, "fact": "portion_fa_g"},
-    {"id": "tgtg", "label": "порций Too Good To Go (1 кг)", "kg": 1.0, "fact": "portion_tgtg_g"},
+    {"id": "sets4", "label": "наборов по 4 кг (как в отчёте РКК)", "kg": 4.0, "fact": "kd_rkk_year_sets"},
 ]
 
 
@@ -67,7 +65,8 @@ def build(rep: Path, stores: pd.DataFrame, hourly_plan: pd.DataFrame, total: dic
     last = preds[preds["action_id"] == last_id].copy()
     last["short"] = last["kg"] - last["pred"]
     below = last[last["kg"] < last["lo80"]].sort_values("short")
-    below_rows = [{"city": city.get(r.store_id, ""), "address": addr.get(r.store_id, ""), "kg": _r(r.kg),
+    # килограммы синтетические — реальные магазины нельзя называть отстающими: в демо вместо адреса код магазина
+    below_rows = [{"city": city.get(r.store_id, ""), "address": f"магазин {r.store_id[:6]} (адрес скрыт в демо)", "kg": _r(r.kg),
                    "pred": _r(r.pred), "lo80": _r(r.lo80), "gap": _r(r.short)} for r in below.head(25).itertuples()]
 
     a = alloc.copy()
@@ -145,11 +144,19 @@ def goal(s: pd.DataFrame, b, sigma: float) -> dict:
 
     steps — [номер строки листа координатора, прирост кг × 10, прирост при эффекте вдвое меньше × 10].
     """
-    from .allocate import extra_steps
+    from .allocate import extra_steps, multiplier
+    alt = 0.5
     row = pd.Series(range(len(s)), index=pd.MultiIndex.from_frame(s[["store_id", "date"]]))
-    st = extra_steps(s, b)
+    # Осторожный сценарий: эффект волонтёра × alt. Уровень сбора привязан к публичной цифре фонда, поэтому
+    # прогноз при нынешней расстановке не меняется — меняется только то, сколько из него «дают» люди:
+    # сбор без волонтёров в сценарии = прогноз / множитель(нынешние люди, b × alt).
+    b_alt = b * alt
+    s = s.assign(base_alt_kg=s["kg_current"] / multiplier(s["v_current"].to_numpy(), b_alt))
+    st = extra_steps(s, b, alt)
     idx = row.reindex(pd.MultiIndex.from_frame(st[["store_id", "date"]])).to_numpy()
     steps = [[int(i), int(round(g * 10)), int(round(ga * 10))]
              for i, g, ga in zip(idx, st["gain_kg"], st["gain_alt_kg"])]
+    kg_alt = lambda v: float((s["base_alt_kg"] * multiplier(s[v].to_numpy(), b_alt)).sum())  # noqa: E731
     return {"kg_current": _r(s["kg_current"].sum()), "kg_opt": _r(s["kg_opt"].sum()),
-            "shifts": int(s["v_opt"].sum()), "sigma": round(float(sigma), 4), "alt_scale": 0.5, "steps": steps}
+            "kg_current_alt": _r(kg_alt("v_current")), "kg_opt_alt": _r(kg_alt("v_opt")),
+            "shifts": int(s["v_opt"].sum()), "sigma": round(float(sigma), 4), "alt_scale": alt, "steps": steps}

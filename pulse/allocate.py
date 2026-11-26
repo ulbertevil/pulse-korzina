@@ -154,16 +154,18 @@ def extra_steps(s: pd.DataFrame, b: np.ndarray, alt_scale: float = 0.5) -> pd.Da
     Внутри слота приросты убывают по k, а рекомендованная расстановка в каждом (город, день) —
     это лучшие кандидаты при её бюджете. Поэтому первые N строк — точный максимум прироста
     при N новых сменах по всей сети. gain_alt_kg — прирост тех же смен, если эффект волонтёра
-    в alt_scale раз от оценённого (осторожный сценарий).
+    в alt_scale раз от оценённого (осторожный сценарий). Если в s есть base_alt_kg — сбор без волонтёров
+    в этом сценарии, — прирост считается от него.
     """
     m = multiplier(np.arange(len(b) + 1), b)
     ma = multiplier(np.arange(len(b) + 1), b * alt_scale)
+    s = s if "base_alt_kg" in s else s.assign(base_alt_kg=s["base_kg"])
     rows = []
     for k in range(1, len(b) + 1):
-        g = s.loc[s["v_opt"] < k, ["store_id", "date", "city", "base_kg"]].copy()
+        g = s.loc[s["v_opt"] < k, ["store_id", "date", "city", "base_kg", "base_alt_kg"]].copy()
         g["k"] = k
         g["gain_kg"] = g["base_kg"] * (m[k] - m[k - 1])
-        g["gain_alt_kg"] = g["base_kg"] * (ma[k] - ma[k - 1])
+        g["gain_alt_kg"] = g["base_alt_kg"] * (ma[k] - ma[k - 1])
         rows.append(g)
     c = pd.concat(rows, ignore_index=True)
     c = c[c["gain_kg"] > 0]

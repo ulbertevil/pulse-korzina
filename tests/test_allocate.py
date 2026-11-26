@@ -103,3 +103,21 @@ def test_shifts_for_target():
     assert allocate.shifts_for_target(steps, start, start + steps["gain_kg"].iloc[:2].sum() + 0.01) == 3
     assert allocate.shifts_for_target(steps, start, start + steps["gain_kg"].sum() + 1) is None
     assert (steps["gain_alt_kg"] < steps["gain_kg"]).all()
+
+
+def test_goal_cautious_scenario_is_consistent():
+    """Осторожный вариант: прогноз при нынешних людях тот же, перестановка и новые смены дают меньше."""
+    from pulse import site_export
+    s = toy_slots()
+    budget = pd.Series({("X", "2026-12-10"): 3, ("Y", "2026-12-10"): 1})
+    current = pd.Series([0, 0, 3, 1], index=pd.MultiIndex.from_frame(s[["store_id", "date"]]))
+    full, _ = allocate.compare(s.assign(start=16, end=20, region="R", chain="Пятёрочка", address="г., ул., 1"),
+                               budget, current, B)
+    g = site_export.goal(full, B, 0.1)
+    assert g["kg_current_alt"] == pytest.approx(g["kg_current"], abs=0.1)
+    assert g["kg_current"] <= g["kg_opt_alt"] < g["kg_opt"]
+    alt = [x[2] for x in g["steps"]]
+    assert all(a < f for _, f, a in g["steps"] if f > 0) and sum(alt) > 0
+    # при эффекте × 1 осторожный вариант совпадает с основным
+    same = allocate.extra_steps(full.assign(base_alt_kg=full["base_kg"]), B, alt_scale=1.0)
+    assert (same["gain_alt_kg"] == same["gain_kg"]).all()

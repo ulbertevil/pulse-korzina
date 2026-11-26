@@ -75,16 +75,24 @@ def volunteer_robustness(slots: pd.DataFrame, budget: pd.Series, current: pd.Ser
                          scales=(0.0, 0.5, 1.0, 2.0)) -> pd.DataFrame:
     """Расстановка рассчитана при эффекте b. Что она даст, если реальный эффект — b × scale?
 
+    Прогноз при нынешней расстановке в каждом сценарии тот же (он привязан к публичной цифре фонда),
+    сбор без волонтёров пересчитывается под сценарий.
+
     Для каждого сценария: прирост к «как сейчас» и к «поровну», и сколько теряем
     по сравнению с расстановкой, которую выбрали бы, зная настоящий эффект.
     """
     opt = allocate.optimize(slots, budget, b)
     uni = allocate.uniform(slots, budget)
+    idx = pd.MultiIndex.from_frame(slots[["store_id", "date"]])
+    v_cur = current.reindex(idx, fill_value=0).to_numpy()
     rows = []
     for s in scales:
         bs = b * s
-        kg = {name: allocate.expected_kg(slots, v, bs).sum() for name, v in
-              (("opt", opt), ("current", current), ("uniform", uni), ("oracle", allocate.optimize(slots, budget, bs)))}
+        # уровень сбора привязан к публичной цифре фонда: при нынешней расстановке прогноз тот же,
+        # меняется только доля, которую дают волонтёры
+        sl = slots.assign(base_kg=slots["base_kg"] * allocate.multiplier(v_cur, b) / allocate.multiplier(v_cur, bs))
+        kg = {name: allocate.expected_kg(sl, v, bs).sum() for name, v in
+              (("opt", opt), ("current", current), ("uniform", uni), ("oracle", allocate.optimize(sl, budget, bs)))}
         rows.append(dict(scale=s, kg_opt=kg["opt"], kg_current=kg["current"], kg_uniform=kg["uniform"],
                          kg_oracle=kg["oracle"],
                          uplift_vs_current=kg["opt"] / kg["current"] - 1,

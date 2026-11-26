@@ -23,7 +23,7 @@
         + "Группы похожих магазинов и прогноз модели сокращают нужную выборку втрое; список «тест / контроль» готов к скачиванию." },
     { target: "#implement", title: "Как внедрить",
       text: "Серверы и персональные данные не нужны. К новой акции — кнопка «Новая акция» на GitHub и ссылка на таблицу магазинов: "
-        + "сайт пересчитается сам. Код открыт, 61 автотест — в том числе сайт проверяется в браузере при каждой публикации." },
+        + "сайт пересчитается сам. Код открыт, 65 автотестов — в том числе сайт проверяется в браузере при каждой публикации." },
   ];
   let i = -1, panel = null, focused = null;
   const done = new Set();
@@ -79,6 +79,9 @@
 
   addEventListener("keydown", (e) => {
     if (!panel || panel.hidden) return;
+    if (e.key === "Escape") { stop(); return; }
+    // стрелки в поле ввода, списке или на графике — их, а не обзора
+    if (e.target.closest && e.target.closest("input, select, textarea, [contenteditable], svg, [role='slider']")) return;
     if (e.key === "Escape") stop();
     else if (e.key === "ArrowRight") go(i + 1);
     else if (e.key === "ArrowLeft") go(i - 1);

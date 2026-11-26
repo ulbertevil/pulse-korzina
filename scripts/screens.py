@@ -52,7 +52,7 @@ def trim(path: Path, pad: int = 24) -> None:
 def shoot(base: str, query: str, width: int, out: Path) -> None:
     scale = 2 if width < 600 else 1
     with tempfile.TemporaryDirectory() as prof:
-        subprocess.run([chrome(), "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--user-data-dir={prof}",
+        subprocess.run([chrome(), "--headless=new", "--disable-gpu", "--hide-scrollbars", "--lang=ru-RU", f"--user-data-dir={prof}",
                         f"--force-device-scale-factor={scale}", f"--window-size={width},3200",
                         "--virtual-time-budget=15000", f"--screenshot={out}", f"{base}?{query}"],
                        check=True, capture_output=True, timeout=180)

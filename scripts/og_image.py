@@ -32,10 +32,9 @@ def dates_label(ds: list[str]) -> str:
 
 def page(d: dict) -> str:
     k, m = d["kpi"], d["meta"]
-    sets = round((k["kg_opt"] - k["kg_current"]) / 6 / 10) * 10
     stats = [
-        (f"{nf(k['pred_kg'] / 1000, 0)} т", f"прогноз сбора на {dates_label(m['dates'])}"),
-        (f"+{nf(sets)}", "наборов теми же волонтёрами, если поставить их, где нужнее"),
+        (f"{nf(k['pred_kg'] / 1000, 0)} т", f"прогноз сбора на {dates_label(m['dates'])} (демо на синтетике)"),
+        (f"{nf(m['stores'])}", "магазинов: прогноз и расстановка волонтёров по каждому"),
         (f"{nf(m['cities'])}", "городов: лист координатора — магазины, часы, сколько людей"),
     ]
     cards = "".join(f'<div class="stat"><b>{html.escape(v)}</b><span>{html.escape(t)}</span></div>' for v, t in stats)
@@ -62,7 +61,7 @@ h1 {{ font-size: 76px; line-height: 1.05; letter-spacing: -1.5px; margin-top: 26
   <p class="lede">Сколько соберём, куда поставить волонтёров и как проверить новую идею экспериментом</p>
 </div>
 <div class="stats">{cards}</div>
-<p class="foot">Демо: магазины и часы — из таблицы фонда, килограммы — синтетика.</p>
+<p class="foot">Неофициальный конкурсный прототип. Магазины и часы — из таблицы фонда, килограммы — синтетика.</p>
 </body></html>"""
 
 
