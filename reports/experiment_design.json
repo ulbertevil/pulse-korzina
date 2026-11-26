@@ -1,0 +1,49 @@
+{
+  "stores": 1740,
+  "n_test": 870,
+  "n_control": 870,
+  "alpha": 0.05,
+  "power": 0.8,
+  "mean": 88.3202643678161,
+  "sd_raw": 68.25372906409518,
+  "sd_cuped": 40.89674873127851,
+  "rho": 0.8006090877485832,
+  "theta": 1.1866052843344685,
+  "sd_cuped_strata": 40.68133589810246,
+  "mde": {
+    "raw": 0.10380721126869547,
+    "cuped": 0.06219993389319233,
+    "cuped_strata": 0.06187231215310404
+  },
+  "stores_needed": {
+    "5%": {
+      "raw": 7501,
+      "cuped": 2693,
+      "cuped_strata": 2665
+    },
+    "10%": {
+      "raw": 1876,
+      "cuped": 674,
+      "cuped_strata": 667
+    },
+    "20%": {
+      "raw": 469,
+      "cuped": 169,
+      "cuped_strata": 167
+    }
+  },
+  "check_aa": {
+    "effect": 0.0,
+    "reject_rate": 0.04,
+    "mean_estimate": 0.0013075843698489632,
+    "n_sims": 200
+  },
+  "check_power_at_mde": {
+    "effect": 0.06187231215310404,
+    "reject_rate": 0.82,
+    "mean_estimate": 0.06317744317581167,
+    "n_sims": 200
+  },
+  "calibrated_on": "2026-11",
+  "synthetic": true
+}

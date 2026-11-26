@@ -13,7 +13,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from pulse import allocate, backtest, features, forecast, synth  # noqa: E402
+from pulse import allocate, backtest, experiment, features, forecast, synth  # noqa: E402
 from pulse.models import GLMEB  # noqa: E402
 from pulse.stores import load_table  # noqa: E402
 
@@ -78,6 +78,25 @@ def main() -> None:
     print(f"расстановка: {alloc_sum['shifts']} смен; оптимально +{alloc_sum['uplift_opt_vs_current']:.1%} "
           f"к «как в ноябре», +{alloc_sum['uplift_opt_vs_uniform']:.1%} к «поровну»; "
           f"кг на смену {alloc_sum['kg_per_shift_current']:.1f} → {alloc_sum['kg_per_shift_opt']:.1f}")
+
+    # A/B: дисперсию и мощность оцениваем на последней акции (факт против прогноза «вслепую»)
+    last = preds[preds["action_id"] == preds["action_id"].max()].merge(
+        stores[["store_id", "chain", "city"]], on="store_id").reset_index(drop=True)
+    des = experiment.design(last)
+    des["check_aa"] = experiment.simulate(last, 0.0, n_sims=200)
+    des["check_power_at_mde"] = experiment.simulate(last, des["mde"]["cuped_strata"], n_sims=200)
+    des["calibrated_on"] = str(last["action_id"].iloc[0])
+    des["synthetic"] = True
+    (rep / "experiment_design.json").write_text(json.dumps(des, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Список «тест / контроль» на 10–11 декабря: страты по прогнозу сбора
+    dec = per_store.rename(columns={"pred_kg": "pred"}).reset_index(drop=True)
+    st = experiment.strata(dec, "pred")
+    dec.assign(stratum=st, group=experiment.assign(dec, st))[
+        ["store_id", "city", "region", "chain", "pred", "stratum", "group"]
+    ].to_csv(rep / "experiment_2026-12_assignment.csv", index=False)
+    print(f"A/B: MDE {des['mde']['raw']:.1%} → {des['mde']['cuped_strata']:.1%} с CUPED и стратами; "
+          f"A/A ложных срабатываний {des['check_aa']['reject_rate']:.0%}, "
+          f"мощность на MDE {des['check_power_at_mde']['reject_rate']:.0%}")
 
 
 if __name__ == "__main__":
