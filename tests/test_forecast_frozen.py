@@ -22,11 +22,18 @@ def test_frozen_numbers_match_store_file():
 
 
 def test_build_reproduces_frozen_forecast():
-    """Пока не подключена новая таблица, сборка даёт тот же прогноз байт в байт."""
+    """Пока не подключена новая таблица, сборка даёт тот же прогноз.
+
+    Байт в байт не сравниваем: на другой версии Python и BLAS расходятся последние знаки дробей.
+    """
     nxt = json.loads((ROOT / "data/next_action.json").read_text(encoding="utf-8"))
     built = ROOT / f"reports/forecast_{FROZEN['action_id']}_stores.csv"
     if nxt.get("table") or nxt.get("action_id") != FROZEN["action_id"]:
         pytest.skip("подключена другая акция — сравнивать не с чем")
     if not built.exists():
         pytest.skip("нет сборки: python scripts/build.py")
-    assert built.read_bytes() == CSV.read_bytes()
+    a = pd.read_csv(built, dtype={"store_id": str})
+    b = pd.read_csv(CSV, dtype={"store_id": str})
+    assert a["store_id"].tolist() == b["store_id"].tolist()
+    for c in ("pred_kg", "lo80", "hi80", "lo95", "hi95"):
+        assert a[c].to_numpy() == pytest.approx(b[c].to_numpy(), rel=1e-9)
