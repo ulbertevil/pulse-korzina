@@ -10,6 +10,18 @@ const MONTHS = ["января", "февраля", "марта", "апреля", 
 const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 const dateLabel = (iso) => { const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
 const dateShort = (iso) => { const d = new Date(iso + "T00:00:00"); return `${WD[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`; };
+/** ["2026-12-10","2026-12-11"] → «10–11 декабря»; разные месяцы — через тире. */
+const datesLabel = (ds) => {
+  if (!ds || !ds.length) return "";
+  const a = new Date(ds[0] + "T00:00:00"), b = new Date(ds[ds.length - 1] + "T00:00:00");
+  if (ds.length === 1) return dateLabel(ds[0]);
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${MONTHS[a.getMonth()]}`;
+  return `${dateLabel(ds[0])} – ${dateLabel(ds[ds.length - 1])}`;
+};
+const plural = (n, one, few, many) => {
+  const a = Math.abs(n) % 100, b = a % 10;
+  return a > 10 && a < 20 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many;
+};
 const actionLabel = (id) => { const [y, m] = id.split("-").map(Number); return `${MONTHS[m - 1].slice(0, 3)} ${y}`; };
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -285,13 +297,20 @@ function renderReality(R, F) {
 function render(D) {
   const k = D.kpi, M = D.meta;
   $("src-table").href = M.source_table;
-  $("next-title").textContent = `Следующая акция: ${M.dates.map(dateLabel).join(" и ").replace(/ декабря и (\d+) декабря/, "–$1 декабря")}`;
+  $("next-title").textContent = `Следующая акция: ${datesLabel(M.dates)}`;
+  $("next-date").value = M.dates[0];
   $("kpi-tons").textContent = tons(k.pred_kg);
   $("kpi-range").textContent = `в 8 случаях из 10 — от ${tons(k.lo80)} до ${tons(k.hi80)}; почти наверняка — от ${tons(k.lo95)} до ${tons(k.hi95)}`;
   $("kpi-stores").textContent = fmt(M.stores);
   $("kpi-geo").textContent = `${fmt(M.cities)} городов, ${fmt(M.regions)} регионов`;
   $("kpi-shifts").textContent = fmt(k.shifts);
   $("kpi-shift-gain").textContent = `При рекомендуемой расстановке ${signedPct(k.uplift_vs_current)} кг к «как в ноябре»`;
+  const extra = k.kg_opt - k.kg_current, sets = extra / 6;
+  $("kpi-gain").replaceChildren(
+    el("strong", { text: `+${fmt(Math.round(sets / 10) * 10)} ${plural(Math.round(sets / 10) * 10, "набор", "набора", "наборов")} без новых волонтёров. ` }),
+    `Те же ${fmt(k.shifts)} смен, поставленные туда, где они дают больше, — это ещё ≈ ${tons(extra)}. `,
+    el("span", { class: "muted", text: "Оценка модели на синтетике; эффект волонтёров нужно подтвердить " }),
+    el("a", { href: "#ab", text: "экспериментом" }), el("span", { class: "muted", text: "." }));
   const sel = $("portion-select");
   D.portions.forEach((p, i) => sel.append(el("option", { value: i, text: p.label })));
   const setPortion = () => { const p = D.portions[sel.value]; $("kpi-portions").textContent = fmt(k.pred_kg / p.kg); };
@@ -328,8 +347,8 @@ function render(D) {
       el("span", { class: "inline-bar", style: `width:${Math.round((r.gain_per_vol_hour / gmax) * 48)}px` }), fmt(r.gain_per_vol_hour, 1)) },
     { title: "Людей: сейчас → надо", num: true, render: (r) => `${r.v_current} → ${r.v_opt}` },
   ], D.ranking.slice(0, 15));
-  $("dl-cities").href = "data/allocation_2026-12_cities.csv";
-  $("dl-slots").href = "data/allocation_2026-12_slots.csv";
+  $("dl-cities").href = "data/allocation_cities.csv";
+  $("dl-slots").href = "data/allocation_slots.csv";
 
   // ниже ожидаемого
   const B = D.below;
@@ -383,7 +402,7 @@ function render(D) {
   upd();
   $("ab-check").textContent = `Проверено на прошлой акции 200 раз: когда эффекта нет, эксперимент ошибочно «находит» его в ${pct(E.aa, 0)} случаев (допустимо 5%); `
     + `когда эффект равен минимальному заметному, находит его в ${pct(E.power_at_mde, 0)} случаев (цель 80%).`;
-  $("dl-assign").href = "data/experiment_2026-12_assignment.csv";
+  $("dl-assign").href = "data/experiment_assignment.csv";
 
   // факты
   const ST = { primary: "первоисточник", secondary: "СМИ", fund_statement: "заявление фонда", unverified: "не проверено", estimate: "оценка" };
@@ -522,7 +541,8 @@ fetch("data/dashboard.json")
 // ---------- План для координатора города ----------
 (function cityPlan() {
   const input = $("city-input"), daySel = $("city-day"), status = $("city-status");
-  let rows = [], cities = new Map(), byNorm = new Map(), csvUrl = null;
+  let rows = [], cities = new Map(), byNorm = new Map(), csvUrl = null, dates = [];
+  let current = null;
   const norm = (x) => String(x || "").toLowerCase().replace(/ё/g, "е").replace(/[\s,]+(г|город)\.?$/, "").replace(/\s+/g, " ").trim();
   const resolve = (x) => (cities.has(x) ? x : byNorm.get(norm(x)));
   const store = { get: () => { try { return localStorage.getItem("pulse.city"); } catch { return null; } },
@@ -538,7 +558,7 @@ fetch("data/dashboard.json")
     const day = daySel.value, list = day ? all.filter((r) => r.date === day) : all;
     const sum = (k) => list.reduce((a, r) => a + r[k], 0);
     const moved = list.filter((r) => r.v_opt !== r.v_current).length;
-    $("city-title").textContent = `${city} · акция ${day ? dateShort(day) : "10–11 декабря"}`;
+    $("city-title").textContent = `${city} · акция ${day ? dateShort(day) : datesLabel(dates)}`;
     $("city-stores").textContent = fmt(new Set(list.map((r) => r.address)).size);
     $("city-slots").textContent = `${fmt(list.length)} смен магазинов (магазин × день)`;
     $("city-shifts").textContent = fmt(sum("v_opt"));
@@ -565,12 +585,34 @@ fetch("data/dashboard.json")
     const head = ["город", "дата", "начало", "конец", "магазин", "сеть", "людей_было", "людей_надо", "ожидаем_кг", "тара_до_кг"];
     const body = list.map((r) => [city, r.date, r.start, r.end, r.address, r.chain, r.v_current, r.v_opt, r.kg_opt, r.hi80].map(cell).join(","));
     csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
-    const a = $("city-csv"); a.href = csvUrl; a.download = `план_${city.replace(/[^\p{L}\d-]+/gu, "_")}_${day || "2026-12-10_11"}.csv`;
+    const a = $("city-csv"); a.href = csvUrl; a.download = `план_${city.replace(/[^\p{L}\d-]+/gu, "_")}_${day || dates.join("_")}.csv`;
     $("city-sheet").hidden = false;
+    current = { city, list, day };
+    if (!$("city-msg-box").hidden) $("city-msg").value = message(current);
+  }
+
+  /** Готовое сообщение для чата волонтёров: где и когда нужны люди. */
+  function message({ city, list, day }) {
+    const need = list.filter((r) => r.v_opt > 0);
+    const when = day ? dateLabel(day) : datesLabel(dates);
+    const lines = [`«Корзина доброты» · ${city.replace(/\s*г\.?$/, "")} · ${when}`, ""];
+    if (!need.length) return lines.concat("В этом городе волонтёры на точках не требуются.").join("\n");
+    const ns = new Set(need.map((r) => r.address)).size;
+    lines.push(`Ищем волонтёров: ${ns} ${plural(ns, "магазин", "магазина", "магазинов")}, ${need.length} ${plural(need.length, "смена", "смены", "смен")}. `
+      + "Сколько человек нужно на смену:");
+    let prev = null;
+    need.forEach((r) => {
+      if (r.date !== prev && !day) { lines.push("", dateShort(r.date)); prev = r.date; }
+      lines.push(`• ${r.start}:00–${r.end}:00 — ${r.address} (${r.chain}): ${r.v_opt}`);
+    });
+    lines.push("", "Откликнитесь координатору — распределим по точкам.");
+    return lines.join("\n");
   }
 
   fetch("data/coordinator.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((D) => {
     rows = D.rows.map((v) => Object.fromEntries(D.fields.map((f, i) => [f, v[i]])));
+    dates = D.dates || [...new Set(rows.map((r) => r.date))].sort();
+    $("city-when").textContent = datesLabel(dates);
     rows.forEach((r) => { if (!cities.has(r.city)) cities.set(r.city, []); cities.get(r.city).push(r); });
     const names = [...cities.keys()].sort((a, b) => cities.get(b).length - cities.get(a).length || a.localeCompare(b, "ru"));
     names.forEach((n) => byNorm.set(norm(n), n));
@@ -584,6 +626,14 @@ fetch("data/dashboard.json")
   input.addEventListener("input", () => { if (cities.has(input.value.trim())) show(input.value.trim()); });
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") show(input.value.trim()); });
   daySel.addEventListener("change", () => show(input.value.trim()));
+  $("city-msg-btn").addEventListener("click", async () => {
+    if (!current) return;
+    const box = $("city-msg-box"), ta = $("city-msg");
+    ta.value = message(current);
+    box.hidden = false;
+    try { await navigator.clipboard.writeText(ta.value); box.querySelector(".sub").textContent = "Скопировано — вставьте в чат волонтёров города. Перед отправкой можно поправить:"; }
+    catch { box.querySelector(".sub").textContent = "Выделите текст и скопируйте (Ctrl+C) — браузер не дал скопировать автоматически:"; ta.select(); }
+  });
   $("city-print").addEventListener("click", () => {
     document.body.classList.add("print-city");
     addEventListener("afterprint", () => document.body.classList.remove("print-city"), { once: true });

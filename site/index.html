@@ -40,6 +40,7 @@
           <p class="label">Прогноз сбора</p>
           <p class="hero-value" id="kpi-tons">—</p>
           <p class="sub" id="kpi-range"></p>
+          <p class="hero-gain" id="kpi-gain"></p>
         </div>
         <div class="tiles">
           <div class="tile"><p class="label">Магазинов</p><p class="tile-value" id="kpi-stores">—</p><p class="sub" id="kpi-geo"></p></div>
@@ -119,7 +120,7 @@
 
     <section id="city" class="section">
       <h2>План для координатора города</h2>
-      <p class="section-lede">Выберите свой город — получите лист на акцию 10–11 декабря: какие магазины, в какие часы, сколько людей поставить и сколько килограммов ждать. Лист можно распечатать или скачать.</p>
+      <p class="section-lede">Выберите свой город — получите лист на акцию <span id="city-when">ближайшую</span>: какие магазины, в какие часы, сколько людей поставить и сколько килограммов ждать. Лист можно распечатать или скачать.</p>
       <div class="card coord">
         <div class="coord-controls no-print">
           <label class="field">Город
@@ -130,9 +131,14 @@
           <div class="coord-actions">
             <button type="button" class="btn" id="city-print">Распечатать</button>
             <a href="#" class="btn btn-2" id="city-csv">Скачать CSV</a>
+            <button type="button" class="btn btn-2" id="city-msg-btn">Текст для чата волонтёров</button>
           </div>
         </div>
         <p class="status" id="city-status" role="status" aria-live="polite"></p>
+        <div class="msg no-print" id="city-msg-box" hidden>
+          <p class="sub">Скопировано — вставьте в чат волонтёров города. Перед отправкой можно поправить:</p>
+          <textarea id="city-msg" rows="10" spellcheck="false"></textarea>
+        </div>
         <div id="city-sheet" hidden>
           <h3 class="print-title" id="city-title"></h3>
           <div class="tiles">
@@ -238,11 +244,11 @@
       <p class="section-lede">Серверы, закупки и персональные данные не нужны: страница статическая, расчёт идёт в браузере, на вход — только магазины, даты и килограммы. Достаточно одного аналитика на пару часов перед каждой акцией и после неё.</p>
       <ol class="steps">
         <li><strong>Сегодня, 1 час.</strong> Выгрузить историю сборов «магазин × день × кг» за прошлые акции (её фиксирует приложение волонтёра при сканировании) и загрузить в разделе <a href="#upload">«Свои данные»</a>. Сразу видно, насколько модель точна на реальных данных, по сравнению с «как в прошлый раз».</li>
-        <li><strong>За 2 недели до акции.</strong> Взять таблицу магазинов акции — ту же, что фонд уже публикует, — и пересобрать прогноз и расстановку (<code>scripts/build.py</code>). Разослать координаторам ссылки на <a href="#city">лист своего города</a>.</li>
+        <li><strong>За 2 недели до акции, 5 минут, без программиста.</strong> На GitHub нажать «Новая акция» и вставить ссылку на таблицу магазинов — ту же, что фонд уже публикует. Таблица проверится, прогноз, расстановка и листы координаторов пересчитаются, сайт обновится сам. Разослать координаторам ссылки на <a href="#city">лист своего города</a> — там есть готовый текст для чата волонтёров.</li>
         <li><strong>После акции.</strong> Загрузить новую выгрузку: план-факт покажет магазины ниже ожидаемого — с ними стоит разобраться (не было волонтёров? неудачное место короба?). Прогноз следующей акции обновится сам.</li>
         <li><strong>На следующей акции — эксперимент.</strong> Выбрать одну идею (например, «+1 волонтёр»), взять список «тест / контроль» из <a href="#ab">калькулятора</a> и после акции измерить эффект. Это заменит допущения модели о волонтёрах настоящим числом.</li>
       </ol>
-      <p class="note">Код открыт: <a href="https://github.com/ulbertevil/pulse-korzina" rel="noopener" target="_blank">github.com/ulbertevil/pulse-korzina</a>, 46 автотестов, подробный план внедрения — в <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/implementation.md" rel="noopener" target="_blank">docs/implementation.md</a>. Страницу можно разместить на любом хостинге фонда.</p>
+      <p class="note">Код открыт: <a href="https://github.com/ulbertevil/pulse-korzina" rel="noopener" target="_blank">github.com/ulbertevil/pulse-korzina</a>, 52 автотеста, подробный план внедрения — в <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/implementation.md" rel="noopener" target="_blank">docs/implementation.md</a>. Страницу можно разместить на любом хостинге фонда.</p>
     </section>
 
     <section id="method" class="section">

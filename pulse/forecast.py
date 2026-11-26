@@ -28,6 +28,26 @@ def plan_from_slots(slots: pd.DataFrame, dates: list[str], action_id: str,
     return plan
 
 
+def plan_from_own_slots(slots: pd.DataFrame, action_id: str, volunteers: pd.Series | float = 0.0) -> pd.DataFrame:
+    """Таблица новой акции → почасовой план: даты и часы — как записаны в самой таблице."""
+    rows = [(action_id, r.store_id, r.date, h) for r in slots.itertuples()
+            for h in range(int(np.floor(r.start)), int(np.ceil(r.end)))]
+    plan = pd.DataFrame(rows, columns=["action_id", "store_id", "date", "hour"]).drop_duplicates()
+    if isinstance(volunteers, pd.Series):
+        plan["volunteers"] = plan["store_id"].map(volunteers).fillna(0).round().astype(int)
+    else:
+        plan["volunteers"] = int(round(volunteers))
+    return plan
+
+
+def fill_volunteers(known: pd.Series, plan_stores: pd.DataFrame) -> pd.Series:
+    """Волонтёры «как в прошлый раз» для магазинов плана; новым — медиана города, иначе сети."""
+    v = plan_stores.set_index("store_id")["city"].to_frame()
+    v["vol"] = known.reindex(v.index)
+    v["vol"] = v["vol"].fillna(v.groupby("city")["vol"].transform("median")).fillna(known.median())
+    return v["vol"]
+
+
 def forecast(history: pd.DataFrame, plan_agg: pd.DataFrame, net_log_sd: float,
              model: GLMEB | None = None) -> tuple[pd.DataFrame, dict]:
     """Спрогнозировать план моделью GLMEB (обучается на истории, если не передана)."""

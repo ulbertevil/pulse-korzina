@@ -207,3 +207,10 @@ tr.day-break td { border-top: 2px solid var(--axis); }
 .role span { color: var(--ink-2); font-size: 14px; }
 .role:hover, .role:focus-visible { border-color: var(--accent); }
 .steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 760px; }
+
+.msg { margin-top: 12px; }
+.msg textarea { width: 100%; box-sizing: border-box; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
+  background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 10px; resize: vertical; }
+
+.hero-gain { margin: 12px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--wash); border-radius: 0 8px 8px 0; font-size: 15px; max-width: 46ch; }
+.hero-gain .muted { color: var(--ink-2); }

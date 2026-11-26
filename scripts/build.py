@@ -1,5 +1,6 @@
-"""Собрать данные, синтетику, бэктест и прогноз на акцию 10–11 декабря 2026.
+"""Собрать данные, синтетику, бэктест, прогноз и расстановку на следующую акцию.
 
+Какая акция следующая — в data/next_action.json (обновляет scripts/new_action.py).
 Запуск: python scripts/build.py
 """
 from __future__ import annotations
@@ -17,8 +18,9 @@ from pulse import allocate, backtest, experiment, features, forecast, reality, s
 from pulse.models import GLMEB  # noqa: E402
 from pulse.stores import load_table  # noqa: E402
 
-RAW = ROOT / "data/raw/stores-2026-11.csv"
-NEXT_DATES = ["2026-12-10", "2026-12-11"]  # facts.csv: kd_next_action
+RAW = ROOT / "data/raw/stores-2026-11.csv"  # история: магазины и часы ноябрьской акции
+NEXT = json.loads((ROOT / "data/next_action.json").read_text(encoding="utf-8"))
+A = NEXT["action_id"]
 
 
 def main() -> None:
@@ -45,35 +47,43 @@ def main() -> None:
     preds.to_csv(rep / "backtest_store_preds.csv", index=False)
     print(summ.round(3).to_string())
 
-    # План декабря: часы как в ноябре, волонтёры — средние по магазину в ноябре (сценарий «как в ноябре»)
+    # План следующей акции; волонтёры — средние по магазину в ноябре (сценарий «как в прошлый раз»)
     nov = hourly[hourly["action_id"] == "2026-11"]
     vol = nov.groupby("store_id")["volunteers"].mean()
-    plan = forecast.plan_from_slots(slots, NEXT_DATES, "2026-12", volunteers=vol)
-    plan_agg = features.aggregate(plan, stores)
+    if NEXT.get("table"):  # фонд подключил таблицу новой акции: её магазины, даты и часы
+        plan_stores, next_slots = load_table(ROOT / NEXT["table"], NEXT["year"])
+        plan = forecast.plan_from_own_slots(next_slots, A, volunteers=forecast.fill_volunteers(vol, plan_stores))
+    else:  # таблицы ещё нет: магазины и часы ноября переносятся на даты из конфига
+        plan_stores = stores
+        plan = forecast.plan_from_slots(slots, NEXT["dates"], A, volunteers=vol)
+    known = stores[~stores["store_id"].isin(plan_stores["store_id"])]
+    stores_all = pd.concat([known, plan_stores], ignore_index=True)  # для плана — свойства из новой таблицы
+    print(f"следующая акция {A}: {plan['store_id'].nunique()} магазинов, даты {', '.join(sorted(plan['date'].unique()))}")
+    plan_agg = features.aggregate(plan, plan_stores)
     sd = forecast.network_log_sd(res)
     model = GLMEB().fit(agg)
     per_store, total = forecast.forecast(agg, plan_agg, sd, model=model)
-    per_store.to_csv(rep / "forecast_2026-12_stores.csv", index=False)
+    per_store.to_csv(rep / f"forecast_{A}_stores.csv", index=False)
     total["sets"] = forecast.kg_to_people(total["pred_kg"])["sets"]
     total["backtest"] = summ.round(4).reset_index().to_dict(orient="records")
     total["synthetic"] = True
-    (rep / "forecast_2026-12.json").write_text(json.dumps(total, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"прогноз 10–11.12: {total['pred_kg']/1000:.1f} т "
+    (rep / f"forecast_{A}.json").write_text(json.dumps(total, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"прогноз {A}: {total['pred_kg']/1000:.1f} т "
           f"(95%: {total['lo95_kg']/1000:.1f}–{total['hi95_kg']/1000:.1f} т), ≈{total['sets']:.0f} наборов")
 
     # Расстановка волонтёров на ту же акцию: те же люди, что в ноябре, по городам и дням
     b = allocate.vol_coefs(model.coef())
     zero = plan_agg.assign(**{f"v{k}": 0.0 for k in features.VOL_LEVELS})
     pred0 = pd.Series(model.predict(zero), index=plan_agg["store_id"].to_numpy())
-    slots_dec = allocate.slot_table(plan, pred0, allocate.hour_weights(hourly, b), stores)
+    slots_dec = allocate.slot_table(plan, pred0, allocate.hour_weights(hourly, b), plan_stores)
     current = plan.groupby(["store_id", "date"])["volunteers"].first()
     budget = (slots_dec.assign(v=current.reindex(pd.MultiIndex.from_frame(slots_dec[["store_id", "date"]])).to_numpy())
               .groupby(["city", "date"])["v"].sum())
     alloc, alloc_sum = allocate.compare(slots_dec, budget, current, b)
-    alloc.to_csv(rep / "allocation_2026-12_slots.csv", index=False)
-    allocate.city_summary(alloc).to_csv(rep / "allocation_2026-12_cities.csv")
+    alloc.to_csv(rep / f"allocation_{A}_slots.csv", index=False)
+    allocate.city_summary(alloc).to_csv(rep / f"allocation_{A}_cities.csv")
     alloc_sum["synthetic"] = True
-    (rep / "allocation_2026-12.json").write_text(json.dumps(alloc_sum, ensure_ascii=False, indent=2),
+    (rep / f"allocation_{A}.json").write_text(json.dumps(alloc_sum, ensure_ascii=False, indent=2),
                                                   encoding="utf-8")
     print(f"расстановка: {alloc_sum['shifts']} смен; оптимально +{alloc_sum['uplift_opt_vs_current']:.1%} "
           f"к «как в ноябре», +{alloc_sum['uplift_opt_vs_uniform']:.1%} к «поровну»; "
@@ -88,18 +98,22 @@ def main() -> None:
     des["calibrated_on"] = str(last["action_id"].iloc[0])
     des["synthetic"] = True
     (rep / "experiment_design.json").write_text(json.dumps(des, ensure_ascii=False, indent=2), encoding="utf-8")
-    # Список «тест / контроль» на 10–11 декабря: страты по прогнозу сбора
+    # Список «тест / контроль» на следующую акцию: страты по прогнозу сбора
     dec = per_store.rename(columns={"pred_kg": "pred"}).reset_index(drop=True)
     st = experiment.strata(dec, "pred")
     dec.assign(stratum=st, group=experiment.assign(dec, st))[
         ["store_id", "city", "region", "chain", "pred", "stratum", "group"]
-    ].to_csv(rep / "experiment_2026-12_assignment.csv", index=False)
+    ].to_csv(rep / f"experiment_{A}_assignment.csv", index=False)
     # Данные для сайта
     hw = allocate.hour_weights(hourly, b)
     pred_cur = pd.Series(per_store["pred_kg"].to_numpy(), index=per_store["store_id"].to_numpy())
     hourly_plan = allocate.hourly_split(plan, pred_cur, hw, b)
-    site = site_export.build(rep, stores, hourly_plan, total, alloc, alloc_sum, allocate.city_summary(alloc),
+    site = site_export.build(rep, stores_all, hourly_plan, total, alloc, alloc_sum, allocate.city_summary(alloc),
                              res, summ, preds, des, ROOT / "data/facts.csv")
+    site["meta"].update({"regions": int(plan_stores["region"].nunique()), "cities": int(plan_stores["city"].nunique()),
+                         "table_connected": bool(NEXT.get("table")), "next_source": NEXT.get("source_url")})
+    if NEXT.get("table") and "docs.google.com" in NEXT.get("source_url", ""):
+        site["meta"]["source_table"] = NEXT["source_url"]
     # Проверка на реальности
     cmp = reality.compare_public(agg, reality.load_facts(ROOT / "data/facts.csv"))
     robust = reality.volunteer_robustness(slots_dec, budget, current, b)
@@ -110,14 +124,15 @@ def main() -> None:
     (rep / "reality.json").write_text(json.dumps(real, ensure_ascii=False, indent=2), encoding="utf-8")
     site["reality"] = real
     coord = site_export.coordinator(alloc, per_store)
+    coord.update({"action": A, "dates": sorted(plan["date"].unique().tolist())})
     (ROOT / "site/data").mkdir(parents=True, exist_ok=True)
     (ROOT / "site/data/coordinator.json").write_text(json.dumps(coord, ensure_ascii=False, separators=(",", ":")),
                                                      encoding="utf-8")
     site_export.write(ROOT / "site/data", site, {
-        "experiment_2026-12_assignment.csv": rep / "experiment_2026-12_assignment.csv",
-        "allocation_2026-12_slots.csv": rep / "allocation_2026-12_slots.csv",
-        "allocation_2026-12_cities.csv": rep / "allocation_2026-12_cities.csv",
-        "forecast_2026-12_stores.csv": rep / "forecast_2026-12_stores.csv",
+        "experiment_assignment.csv": rep / f"experiment_{A}_assignment.csv",
+        "allocation_slots.csv": rep / f"allocation_{A}_slots.csv",
+        "allocation_cities.csv": rep / f"allocation_{A}_cities.csv",
+        "forecast_stores.csv": rep / f"forecast_{A}_stores.csv",
         "facts.csv": ROOT / "data/facts.csv",
     })
     # Демо-выгрузка для кнопки «Попробовать» на сайте: та же синтетика в формате выгрузки фонда

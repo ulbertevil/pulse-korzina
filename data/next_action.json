@@ -1,0 +1,8 @@
+{
+  "action_id": "2026-12",
+  "dates": ["2026-12-10", "2026-12-11"],
+  "year": 2026,
+  "table": null,
+  "source_url": "https://asi.org.ru/report/2026/11/12/rkk-i-fond-x5-vyruchaem-podveli-itogi-pervogo-goda-akczii-korzina-dobroty/",
+  "note": "Таблицы магазинов декабрьской акции ещё нет: берём магазины и часы ноября, даты — 10–11 декабря (facts.csv: kd_next_action). Когда фонд опубликует таблицу, запустите «Новая акция» в GitHub Actions."
+}

@@ -1,0 +1,54 @@
+name: Новая акция
+
+# Фонд подключает таблицу магазинов следующей акции без программиста:
+# Actions → «Новая акция» → Run workflow → вставить ссылку на Google-таблицу.
+# Таблица скачивается и проверяется, прогноз, расстановка и листы координаторов
+# пересчитываются, сайт публикуется заново. Отчёт о проверке — на странице запуска.
+
+on:
+  workflow_dispatch:
+    inputs:
+      table_url:
+        description: "Ссылка на Google-таблицу магазинов акции (доступ по ссылке)"
+        required: true
+      year:
+        description: "Год акции, если в таблице даты без года и это не ближайшая акция"
+        required: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: new-action
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Скачать и проверить таблицу
+        env:
+          TABLE_URL: ${{ inputs.table_url }}
+          YEAR: ${{ inputs.year }}
+        run: python scripts/new_action.py --url "$TABLE_URL" ${YEAR:+--year "$YEAR"}
+      - name: Пересчитать прогноз и расстановку
+        run: python scripts/build.py
+      - name: Проверить тесты
+        run: python -m pytest -q
+      - name: Сохранить в репозиторий
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data reports
+          ACTION=$(python -c "import json;print(json.load(open('data/next_action.json'))['action_id'])")
+          git commit -m "Новая акция $ACTION: таблица магазинов подключена" || echo "изменений нет"
+          git push
+      - name: Опубликовать сайт
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref "${{ github.ref_name }}"
