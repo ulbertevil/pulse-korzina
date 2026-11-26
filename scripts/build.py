@@ -13,7 +13,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from pulse import allocate, backtest, experiment, features, forecast, site_export, synth  # noqa: E402
+from pulse import allocate, backtest, experiment, features, forecast, site_export, synth, upload  # noqa: E402
 from pulse.models import GLMEB  # noqa: E402
 from pulse.stores import load_table  # noqa: E402
 
@@ -107,6 +107,8 @@ def main() -> None:
         "forecast_2026-12_stores.csv": rep / "forecast_2026-12_stores.csv",
         "facts.csv": ROOT / "data/facts.csv",
     })
+    # Демо-выгрузка для кнопки «Попробовать» на сайте: та же синтетика в формате выгрузки фонда
+    upload.demo_export(hourly, stores).to_csv(ROOT / "site/data/demo_export.csv", index=False)
     print(f"A/B: MDE {des['mde']['raw']:.1%} → {des['mde']['cuped_strata']:.1%} с CUPED и стратами; "
           f"A/A ложных срабатываний {des['check_aa']['reject_rate']:.0%}, "
           f"мощность на MDE {des['check_power_at_mde']['reject_rate']:.0%}")

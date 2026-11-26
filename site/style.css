@@ -145,3 +145,24 @@ td .muted { color: var(--muted); }
 .prose h3 + ul { margin-top: 6px; }
 .foot { padding: 24px 16px 40px; color: var(--muted); font-size: 13px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.upload-controls { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+@media (max-width: 860px) { .upload-controls { grid-template-columns: minmax(0, 1fr); } }
+.drop {
+  display: grid; gap: 6px; align-content: center; min-height: 120px; padding: 18px; cursor: pointer;
+  border: 1.5px dashed var(--axis); border-radius: 12px; background: var(--page); transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over, .drop:focus-within { border-color: var(--accent); background: var(--wash); }
+.drop-title { font-weight: 600; }
+.upload-side { display: grid; gap: 10px; align-content: start; }
+.date-label { display: grid; gap: 4px; font-size: 14px; color: var(--ink-2); }
+.date-label input { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.btn { font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .6; cursor: progress; }
+.status { margin: 12px 0 0; color: var(--ink-2); font-size: 14px; min-height: 1.5em; }
+.status.err { color: var(--critical); }
+.check { font-size: 14px; color: var(--ink-2); margin: 6px 0 14px; }
+.check ul { margin: 6px 0 0; padding-left: 18px; }
+.up-tiles { margin: 8px 0 18px; }
+.up-h { margin: 6px 0 8px; }

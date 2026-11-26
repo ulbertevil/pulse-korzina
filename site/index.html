@@ -18,10 +18,10 @@
         <strong>Демо на синтетических данных.</strong>
         Магазины, города и часы акции — реальные, из <a id="src-table" href="#">таблицы фонда</a>.
         Килограммы и волонтёры смоделированы и откалиброваны по одной публичной цифре фонда.
-        На выгрузке фонда все расчёты пересчитаются на реальных данных.
+        Свою выгрузку можно <a href="#upload">загрузить прямо на странице</a>: расчёт пройдёт в браузере.
       </div>
       <nav class="toc" aria-label="Разделы">
-        <a href="#next">Прогноз</a><a href="#volunteers">Волонтёры</a><a href="#below">Ниже ожидаемого</a>
+        <a href="#next">Прогноз</a><a href="#upload">Свои данные</a><a href="#volunteers">Волонтёры</a><a href="#below">Ниже ожидаемого</a>
         <a href="#accuracy">Точность</a><a href="#ab">A/B</a><a href="#method">Методика</a>
       </nav>
     </div>
@@ -56,6 +56,41 @@
         <div class="legend" id="hourly-legend"></div>
         <div class="chart" id="hourly-chart"></div>
         <details class="table-view"><summary>Таблица</summary><div id="hourly-table"></div></details>
+      </div>
+    </section>
+
+    <section id="upload" class="section">
+      <h2>Посчитать на своих данных</h2>
+      <p class="section-lede">Загрузите выгрузку «магазин × день × кг» за несколько прошлых акций. Модель обучится прямо в браузере, покажет план-факт последней акции, проверит себя на истории и даст прогноз следующей. <strong>Файл не покидает ваш компьютер</strong>: ничего не отправляется на сервер.</p>
+      <div class="card upload">
+        <div class="upload-controls">
+          <label class="drop" id="drop">
+            <input type="file" id="file" accept=".csv,text/csv" class="visually-hidden">
+            <span class="drop-title">Выберите CSV или перетащите сюда</span>
+            <span class="sub">Колонки: магазин, дата, кг; по желанию — начало, конец, волонтёров_в_час, город, регион, сеть. Разделитель — запятая или точка с запятой.</span>
+          </label>
+          <div class="upload-side">
+            <label class="date-label">Дата следующей акции
+              <input type="date" id="next-date" value="2026-12-10"></label>
+            <button type="button" class="btn" id="demo-btn">Попробовать на демо-выгрузке</button>
+            <p class="sub"><a href="template.csv" download>Шаблон выгрузки (CSV)</a> · <a href="data/demo_export.csv" download>Демо-выгрузка (синтетика)</a></p>
+          </div>
+        </div>
+        <p class="status" id="up-status" role="status" aria-live="polite"></p>
+        <div class="check" id="up-check" hidden></div>
+        <div id="up-result" hidden>
+          <div class="tiles up-tiles">
+            <div class="tile"><p class="label">Прогноз следующей акции</p><p class="tile-value" id="up-tons">—</p><p class="sub" id="up-range"></p></div>
+            <div class="tile"><p class="label">Ошибка модели на истории</p><p class="tile-value" id="up-wape">—</p><p class="sub" id="up-wape-sub"></p></div>
+            <div class="tile"><p class="label">Ниже ожидаемого в последней акции</p><p class="tile-value" id="up-below">—</p><p class="sub" id="up-below-sub"></p></div>
+          </div>
+          <h3 class="up-h">Магазины с наибольшим недобором</h3>
+          <div id="up-table" class="scroll"></div>
+          <p>
+            <a href="#" class="download" id="up-dl-plan">Скачать план-факт по всем магазинам (CSV)</a> ·
+            <a href="#" class="download" id="up-dl-fc">Скачать прогноз следующей акции (CSV)</a>
+          </p>
+        </div>
       </div>
     </section>
 

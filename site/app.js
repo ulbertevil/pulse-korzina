@@ -319,3 +319,118 @@ fetch("data/dashboard.json")
   .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(render)
   .catch((e) => { $("app").prepend(el("p", { class: "banner", text: `Не удалось загрузить данные (${e.message}). Запустите scripts/build.py.` })); });
+
+// ---------- Свои данные: расчёт в браузере (model.js в Web Worker) ----------
+(function upload() {
+  const status = $("up-status"), demoBtn = $("demo-btn"), drop = $("drop"), fileInput = $("file");
+  let worker = null, urls = [];
+  const say = (text, err = false) => { status.textContent = text; status.classList.toggle("err", err); };
+  const csvCell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const csvBlob = (cols, rows) => {
+    const text = [cols.map((c) => c[0]).join(",")].concat(rows.map((r) => cols.map((c) => csvCell(c[1](r))).join(","))).join("\n");
+    const u = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+    urls.push(u);
+    return u;
+  };
+  const r1 = (x) => Math.round(x * 10) / 10;
+  const COLS = { store: "магазин", date: "дата", kg: "кг", start: "начало", end: "конец", hours: "часы",
+    volunteers: "волонтёры", city: "город", region: "регион", chain: "сеть" };
+
+  function showReport(rep) {
+    const box = $("up-check");
+    const ok = rep.missing.length === 0;
+    const items = [
+      `Строк в файле: ${fmt(rep.rows)}, взято в расчёт: ${fmt(rep.used ?? 0)}.`,
+      `Узнали колонки: ${rep.columns.map((c) => COLS[c] || c).join(", ") || "никакие"}.`,
+    ];
+    if (!ok) items.push(`Не хватает обязательных колонок: ${rep.missing.map((c) => COLS[c]).join(", ")}. Сверьтесь с шаблоном.`);
+    Object.entries(rep.reasons).forEach(([why, n]) => items.push(`Пропущено строк — ${why}: ${fmt(n)}.`));
+    if (ok && !rep.hasHours) items.push("Нет часов работы точки: считаем по 4 часа на день.");
+    if (ok && !rep.hasVolunteers) items.push("Нет числа волонтёров: эффект волонтёров не оценивается.");
+    const ul = el("ul");
+    items.forEach((t) => ul.append(el("li", { text: t })));
+    box.replaceChildren(el("strong", { text: "Проверка файла" }), ul);
+    box.hidden = false;
+  }
+
+  function showResult(R) {
+    const F = R.forecast;
+    const box = $("up-check");
+    box.querySelector("ul").append(el("li", { text:
+      `Нашли акций: ${R.actions.length} (${R.actions.map((d) => `${dateLabel(d)} ${d.slice(0, 4)}`).join(", ")}), магазинов: ${fmt(R.stores)}. `
+      + "Новая акция начинается после перерыва больше 7 дней." }));
+    $("up-tons").textContent = tons(F.kg);
+    $("up-range").textContent = `${dateLabel(F.date)}, ${fmt(F.stores)} магазинов с часами и волонтёрами как в последней акции; 80% — ${tons(F.lo80)}…${tons(F.hi80)}`;
+    if (R.steps.length) {
+      const y = R.steps.reduce((a, s) => a + s.net_true, 0);
+      const w = (k) => R.steps.reduce((a, s) => a + s[k] * s.net_true, 0) / y;
+      $("up-wape").textContent = pct(w("wape_glm"));
+      $("up-wape-sub").textContent = `средняя ошибка по магазину на ${R.steps.length} прошлых акциях; «как в прошлый раз» — ${pct(w("wape_naive"))}`;
+    } else {
+      $("up-wape").textContent = "—";
+      $("up-wape-sub").textContent = "для проверки на истории нужно хотя бы 4 акции";
+    }
+    const below = R.planFact.filter((r) => r.kg < r.lo80);
+    $("up-below").textContent = fmt(below.length);
+    $("up-below-sub").textContent = `из ${fmt(R.planFact.length)} магазинов акции ${dateLabel(R.lastAction)} — ниже нижней границы 80% прогноза`;
+    table($("up-table"), [
+      { title: "Магазин", render: (r) => el("span", {}, r.store, el("br"), el("span", { class: "muted", text: r.region || r.city })) },
+      { title: "Факт, кг", num: true, render: (r) => fmt(r.kg) },
+      { title: "Ожидали, кг", num: true, render: (r) => `${fmt(r.pred)} (${fmt(r.lo80)}–${fmt(r.hi80)})` },
+      { title: "Разница", num: true, render: (r) => el("span", { class: r.kg < r.pred ? "down" : "", text: signedPct(r.kg / r.pred - 1, 0) }) },
+    ], R.planFact.slice(0, 10));
+    urls.forEach((u) => URL.revokeObjectURL(u)); urls = [];
+    const a1 = $("up-dl-plan"), a2 = $("up-dl-fc");
+    a1.href = csvBlob([["магазин", (r) => r.store], ["город", (r) => r.city], ["регион", (r) => r.region], ["факт_кг", (r) => r1(r.kg)],
+      ["прогноз_кг", (r) => r1(r.pred)], ["нижняя_80", (r) => r1(r.lo80)], ["верхняя_80", (r) => r1(r.hi80)],
+      ["ниже_ожидаемого", (r) => (r.kg < r.lo80 ? "да" : "")]], R.planFact);
+    a1.download = `план-факт_${R.lastAction}.csv`;
+    a2.href = csvBlob([["магазин", (r) => r.store], ["город", (r) => r.city], ["регион", (r) => r.region], ["прогноз_кг", (r) => r1(r.pred)],
+      ["нижняя_80", (r) => r1(r.lo80)], ["верхняя_80", (r) => r1(r.hi80)]], F.perStore);
+    a2.download = `прогноз_${F.date}.csv`;
+    $("up-result").hidden = false;
+  }
+
+  function run(text, label) {
+    if (worker) worker.terminate();
+    $("up-result").hidden = true;
+    $("up-check").hidden = true;
+    demoBtn.disabled = true;
+    say(`Читаем ${label}…`);
+    const t0 = performance.now();
+    worker = new Worker("worker.js");
+    worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === "report") { showReport(m.report); say("Обучаем модель…"); }
+      else if (m.type === "progress") say(`Проверяем модель на прошлых акциях: ${m.i} из ${m.n}…`);
+      else if (m.type === "error") { say(`Ошибка расчёта: ${m.message}`, true); demoBtn.disabled = false; }
+      else if (m.type === "done") {
+        demoBtn.disabled = false;
+        worker.terminate(); worker = null;
+        const R = m.result;
+        if (!R) { say("Файл не подходит: см. проверку ниже.", true); return; }
+        if (R.error) { say(R.error, true); return; }
+        showResult(R);
+        say(`Готово за ${fmt((performance.now() - t0) / 1000, 1)} с: ${label}.`);
+      }
+    };
+    worker.onerror = (e) => { say(`Ошибка расчёта: ${e.message}`, true); demoBtn.disabled = false; };
+    worker.postMessage({ text, nextDate: $("next-date").value || "2026-12-10" });
+  }
+
+  const readFile = (f) => {
+    if (!f) return;
+    if (f.size > 50 * 1024 * 1024) { say("Файл больше 50 МБ — сократите период или число колонок.", true); return; }
+    f.text().then((t) => run(t, `файл «${f.name}»`), (e) => say(`Не удалось прочитать файл: ${e.message}`, true));
+  };
+  fileInput.addEventListener("change", () => readFile(fileInput.files[0]));
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove("over")));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); readFile(e.dataTransfer.files[0]); });
+  demoBtn.addEventListener("click", () => {
+    say("Загружаем демо-выгрузку…");
+    fetch("data/demo_export.csv").then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then((t) => run(t, "демо-выгрузка (синтетические данные)"))
+      .catch((e) => say(`Демо-выгрузка не найдена (${e.message}). Запустите scripts/build.py.`, true));
+  });
+})();
