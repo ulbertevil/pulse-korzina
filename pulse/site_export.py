@@ -58,8 +58,8 @@ def build(rep: Path, stores: pd.DataFrame, hourly_plan: pd.DataFrame, total: dic
                       "lo95": _r(r.net_lo95, 0), "hi95": _r(r.net_hi95, 0), "naive": _r(naive_pred, 0),
                       "wape": _r(r.wape, 4), "cover80": _r(r.cover80, 3), "cover95": _r(r.cover95, 3)})
 
-    names = {"glm_eb": "GLM + эмпирический Байес", "ses": "Экспоненциальное сглаживание",
-             "seasonal_naive": "Сезонная наивная", "naive": "Наивная («как в прошлый раз»)"}
+    names = {"glm_eb": "Модель «Пульса»", "ses": "Сглаживание прошлых акций",
+             "seasonal_naive": "Как в тот же сезон год назад", "naive": "Как в прошлый раз"}
     models = [{"id": m, "name": names.get(m, m), "wape": _r(r.wape, 4), "network_ape": _r(r.network_ape, 4),
                "vs_naive": _r(r.wape_vs_naive, 4)} for m, r in summ.iterrows()]
 

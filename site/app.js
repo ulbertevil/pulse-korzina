@@ -160,7 +160,7 @@ function hbarChart(container, rows, { valFmt, color }) {
       svg.append(s("line", { x1: m.l, x2: m.l, y1: y - 4, y2: y + barH + 4, class: "base" }));
       const path = `M${m.l},${y} h${w - 4} a4,4 0 0 1 4,4 v${barH - 8} a4,4 0 0 1 -4,4 h${-(w - 4)} z`;
       const bar = s("path", { d: path, fill: r.color || color, class: "bar", tabindex: 0 });
-      const show = (e) => showTip(e, r.label, [{ color: r.color || color, value: valFmt(r.value), name: "WAPE" }]);
+      const show = (e) => showTip(e, r.label, [{ color: r.color || color, value: valFmt(r.value), name: "ошибка по магазинам" }]);
       bar.addEventListener("pointermove", show);
       bar.addEventListener("pointerleave", hideTip);
       bar.addEventListener("focus", () => { const b = bar.getBoundingClientRect(); show({ clientX: b.right, clientY: b.top }); });
@@ -287,7 +287,7 @@ function render(D) {
   $("src-table").href = M.source_table;
   $("next-title").textContent = `Следующая акция: ${M.dates.map(dateLabel).join(" и ").replace(/ декабря и (\d+) декабря/, "–$1 декабря")}`;
   $("kpi-tons").textContent = tons(k.pred_kg);
-  $("kpi-range").textContent = `80% интервал: ${tons(k.lo80)} – ${tons(k.hi80)}; 95%: ${tons(k.lo95)} – ${tons(k.hi95)}`;
+  $("kpi-range").textContent = `в 8 случаях из 10 — от ${tons(k.lo80)} до ${tons(k.hi80)}; почти наверняка — от ${tons(k.lo95)} до ${tons(k.hi95)}`;
   $("kpi-stores").textContent = fmt(M.stores);
   $("kpi-geo").textContent = `${fmt(M.cities)} городов, ${fmt(M.regions)} регионов`;
   $("kpi-shifts").textContent = fmt(k.shifts);
@@ -355,11 +355,11 @@ function render(D) {
   lineChart($("steps-chart"), { series: ss, xs: acts, xLabel: actionLabel, valFmt: (v) => tons(v), yFmt: (v) => fmt(v / 1000) + " т", height: 240 });
   table($("steps-table"), [{ title: "Акция", render: (r) => actionLabel(r.action) }, { title: "Факт", num: true, render: (r) => tons(r.true) },
     { title: "Модель", num: true, render: (r) => tons(r.pred) }, { title: "95% интервал", num: true, render: (r) => `${tons(r.lo95)} – ${tons(r.hi95)}` },
-    { title: "Наивный", num: true, render: (r) => tons(r.naive) }, { title: "WAPE магазинов", num: true, render: (r) => pct(r.wape) }], D.steps);
+    { title: "Наивный", num: true, render: (r) => tons(r.naive) }, { title: "Ошибка по магазинам", num: true, render: (r) => pct(r.wape) }], D.steps);
   const mrows = D.models.map((mo) => ({ label: mo.name, value: mo.wape, color: mo.id === "glm_eb" ? css("--s1") : css("--axis") }));
   $("models-chart").dataset.label = "Ошибка моделей по магазинам";
   hbarChart($("models-chart"), mrows, { valFmt: (v) => pct(v), color: css("--s1") });
-  table($("models-table"), [{ title: "Модель", key: "name" }, { title: "WAPE", num: true, render: (r) => pct(r.wape) },
+  table($("models-table"), [{ title: "Модель", key: "name" }, { title: "Ошибка по магазинам", num: true, render: (r) => pct(r.wape) },
     { title: "Ошибка суммы", num: true, render: (r) => pct(r.network_ape) },
     { title: "К наивной", num: true, render: (r) => (r.id === "naive" ? "—" : signedPct(r.vs_naive)) }], D.models);
 
@@ -373,16 +373,16 @@ function render(D) {
     $("ab-n-out").textContent = fmt(n); $("ab-share-out").textContent = pct(share, 0); $("ab-eff-out").textContent = "+" + pct(eff, 0);
     const mC = mde(E.sd_cuped_strata, E.mean, nt, nc, alpha, power), mR = mde(E.sd_raw, E.mean, nt, nc, alpha, power);
     const nC = need(E.sd_cuped_strata, E.mean, eff, share, alpha, power), nR = need(E.sd_raw, E.mean, eff, share, alpha, power);
-    $("ab-mde").textContent = pct(mC); $("ab-mde-raw").textContent = `без CUPED и страт: ${pct(mR)}`;
-    $("ab-need").textContent = fmt(nC); $("ab-need-raw").textContent = `без CUPED и страт: ${fmt(nR)}`;
+    $("ab-mde").textContent = pct(mC); $("ab-mde-raw").textContent = `при простом делении: ${pct(mR)}`;
+    $("ab-need").textContent = fmt(nC); $("ab-need-raw").textContent = `при простом делении: ${fmt(nR)}`;
     $("ab-verdict").textContent = nC <= n
       ? `Хватает: эффект ${pct(eff, 0)} будет заметен на ${fmt(n)} магазинах (${fmt(nt)} в тесте, ${fmt(nc)} в контроле).`
       : `Не хватает: для эффекта ${pct(eff, 0)} нужно ${fmt(nC)} магазинов, а в эксперименте ${fmt(n)}. Увеличьте выборку или ищите эффект крупнее.`;
   };
   ["ab-n", "ab-share", "ab-eff", "ab-alpha", "ab-power"].forEach((id) => $(id).addEventListener("input", upd));
   upd();
-  $("ab-check").textContent = `Проверка на прошлой акции: в 200 A/A-тестах ложных срабатываний ${pct(E.aa, 0)} (норма 5%); `
-    + `при эффекте, равном MDE, эксперимент находит его в ${pct(E.power_at_mde, 0)} случаев (цель 80%). Корреляция прогноза с фактом ρ = ${fmt(E.rho, 2)}.`;
+  $("ab-check").textContent = `Проверено на прошлой акции 200 раз: когда эффекта нет, эксперимент ошибочно «находит» его в ${pct(E.aa, 0)} случаев (допустимо 5%); `
+    + `когда эффект равен минимальному заметному, находит его в ${pct(E.power_at_mde, 0)} случаев (цель 80%).`;
   $("dl-assign").href = "data/experiment_2026-12_assignment.csv";
 
   // факты
@@ -528,13 +528,13 @@ fetch("data/dashboard.json")
   const store = { get: () => { try { return localStorage.getItem("pulse.city"); } catch { return null; } },
     set: (v) => { try { localStorage.setItem("pulse.city", v); } catch { /* приватный режим */ } } };
 
-  function show(raw) {
+  function show(raw, fromUser = true) {
     const city = resolve(raw), all = cities.get(city);
     if (!all) { $("city-sheet").hidden = true; status.textContent = city ? "Такого города нет в акции — выберите из списка." : ""; return; }
     status.textContent = "";
     if (input.value !== city) input.value = city;
     store.set(city);
-    const u = new URL(location.href); u.searchParams.set("city", city); history.replaceState(null, "", u);
+    if (fromUser) { const u = new URL(location.href); u.searchParams.set("city", city); history.replaceState(null, "", u); }
     const day = daySel.value, list = day ? all.filter((r) => r.date === day) : all;
     const sum = (k) => list.reduce((a, r) => a + r[k], 0);
     const moved = list.filter((r) => r.v_opt !== r.v_current).length;
@@ -577,7 +577,7 @@ fetch("data/dashboard.json")
     $("city-list").replaceChildren(...names.map((n) => el("option", { value: n })));
     [...new Set(rows.map((r) => r.date))].sort().forEach((d) => daySel.append(el("option", { value: d, text: dateShort(d) })));
     const want = new URL(location.href).searchParams.get("city") || store.get();
-    show(resolve(want) || names[0]);
+    show(resolve(want) || names[0], false);
   }).catch((e) => { status.textContent = `Не удалось загрузить план (${e.message}). Запустите scripts/build.py.`; status.classList.add("err"); });
 
   input.addEventListener("change", () => show(input.value.trim()));
