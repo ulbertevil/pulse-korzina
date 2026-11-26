@@ -91,13 +91,17 @@ const compact = (v) => (Math.abs(v) >= 10000 ? nf(0).format(v / 1000) + " тыс
 
 // ---------- линейный график с полосой ----------
 // series: [{name, color, points:[{x, y, lo, hi}], band:bool, dots:bool}], xs: [x...], xLabel(x)
-function lineChart(container, { series, xs, xLabel, yFmt = compact, valFmt = (v) => fmt(v), titleFmt = xLabel, height = 260 }) {
+function lineChart(container, { series, xs, xLabel, yFmt = compact, valFmt = (v) => fmt(v), titleFmt = xLabel, height = 260, yMin = null, xTicks = null }) {
   const draw = () => {
     const W = Math.max(280, container.clientWidth), H = height;
     const m = { t: 12, r: 16, b: 28, l: 52 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
     const all = series.flatMap((sr) => sr.points.flatMap((p) => [p.y, p.lo ?? p.y, p.hi ?? p.y]));
-    const ticks = niceTicks(Math.min(0, ...all), Math.max(...all) * 1.05);
+    const lo = yMin ?? Math.min(0, ...all), hi = Math.max(...all);
+    const ticks = niceTicks(lo, yMin == null ? hi * 1.05 : hi + (hi - lo) * 0.05);
+    const st = ticks.length > 1 ? ticks[1] - ticks[0] : 1;
+    while (ticks[0] > lo + 1e-9) ticks.unshift(ticks[0] - st);
+    while (ticks[ticks.length - 1] < hi - 1e-9) ticks.push(ticks[ticks.length - 1] + st);
     const y0 = ticks[0], y1 = ticks[ticks.length - 1];
     const xi = (x) => xs.indexOf(x);
     const X = (x) => m.l + (xs.length === 1 ? iw / 2 : (xi(x) / (xs.length - 1)) * iw);
@@ -109,7 +113,7 @@ function lineChart(container, { series, xs, xLabel, yFmt = compact, valFmt = (v)
     });
     const every = Math.ceil(xs.length / Math.max(2, Math.floor(iw / 64)));
     xs.forEach((x, i) => {
-      if (i % every) return;
+      if (xTicks ? !xTicks.includes(x) : i % every) return;
       const tx = s("text", { x: X(x), y: H - 8, "text-anchor": "middle" }); tx.textContent = xLabel(x); svg.append(tx);
     });
     series.forEach((sr) => {
@@ -563,6 +567,8 @@ fetch("data/dashboard.json")
 })();
 
 // ---------- План для координатора города ----------
+const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
 (function cityPlan() {
   const input = $("city-input"), daySel = $("city-day"), status = $("city-status");
   let rows = [], cities = new Map(), byNorm = new Map(), csvUrl = null, dates = [];
@@ -633,7 +639,7 @@ fetch("data/dashboard.json")
     return lines.join("\n");
   }
 
-  fetch("data/coordinator.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((D) => {
+  coordData.then((D) => {
     rows = D.rows.map((v) => Object.fromEntries(D.fields.map((f, i) => [f, v[i]])));
     dates = D.dates || [...new Set(rows.map((r) => r.date))].sort();
     $("city-when").textContent = datesLabel(dates);
@@ -672,4 +678,118 @@ fetch("data/dashboard.json")
     addEventListener("afterprint", () => document.body.classList.remove("print-city"), { once: true });
     print();
   });
+})();
+
+// ---------- цель акции → сколько смен добавить ----------
+(function goalPlan() {
+  const input = $("goal-t"), conf = $("goal-conf"), status = $("goal-status");
+  let G = null, rows = [], cum = [], cumAlt = [], csvUrl = null, chartKey = "";
+
+  /** Сколько первых шагов нужно, чтобы прибавка дошла до need кг; null — не хватает. */
+  const stepsFor = (c, need) => {
+    if (need <= 0) return 0;
+    let lo = 0, hi = c.length - 1;
+    if (!c.length || c[hi] < need) return null;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (c[m] >= need) hi = m; else lo = m + 1; }
+    return lo + 1;
+  };
+  const t = (kg) => tons(kg, kg >= 100000 ? 1 : 2);
+  const shiftsTxt = (n) => `${fmt(n)} ${plural(n, "смена", "смены", "смен")}`;
+
+  function chart(n, targetMean) {
+    const max = cum.length;
+    const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000].find((v) => max / v <= 80) || 2000;
+    const xs = []; for (let i = 0; i <= max; i += step) xs.push(i);
+    if (xs[xs.length - 1] !== max) xs.push(max);
+    const lab = niceTicks(0, max, 5).filter((v) => v % step === 0);
+    const key = `${targetMean}`;
+    if (key === chartKey) return;
+    chartKey = key;
+    const at = (c, i) => (i === 0 ? 0 : c[i - 1]);
+    const s1 = css("--s1"), s2 = css("--s2"), ref = css("--muted");
+    const series = [
+      { name: "по модели", color: s1, points: xs.map((x) => ({ x, y: G.kg_opt + at(cum, x) })) },
+      { name: "если эффект вдвое меньше", color: s2, points: xs.map((x) => ({ x, y: G.kg_opt + at(cumAlt, x) })) },
+      { name: "цель с учётом уверенности", color: ref, points: xs.map((x) => ({ x, y: targetMean })) },
+    ];
+    legend($("goal-legend"), series.map((sr) => ({ name: sr.name, color: sr.color })));
+    const lo = Math.min(G.kg_current, targetMean, G.kg_opt) * 0.97;
+    lineChart($("goal-chart"), { series, xs, yMin: lo, height: 240,
+      xTicks: lab, xLabel: (x) => fmt(x), titleFmt: (x) => `+${shiftsTxt(x)}`, yFmt: (v) => fmt(v / 1000) + " т", valFmt: (v) => t(v) });
+  }
+
+  function show() {
+    if (!G) return;
+    const goalT = Number(String(input.value).replace(",", "."));
+    if (!(goalT > 0)) { status.textContent = "Введите цель в тоннах, например 150."; $("goal-body").hidden = true; return; }
+    status.textContent = "";
+    const target = goalT * 1000, p = Number(conf.value);
+    const mean = target * Math.exp(normPpf(p) * G.sigma);  // ожидание, при котором сумма ≥ цели с вероятностью p
+    const need = mean - G.kg_opt, n = stepsFor(cum, need), nAlt = stepsFor(cumAlt, need);
+    const max = G.kg_opt + (cum[cum.length - 1] || 0);
+    const confTxt = p > 0.5 ? ` в ${p === 0.8 ? "8" : "9"} акциях из 10` : "";
+    $("goal-body").hidden = false;
+    let verdict;
+    if (mean <= G.kg_current) {
+      verdict = `Цель ${t(target)}${confTxt} достижима и без изменений: прогноз при ноябрьской расстановке — ${t(G.kg_current)}.`;
+    } else if (n === 0) {
+      verdict = `Новые люди не нужны: хватит переставить нынешних ${fmt(G.shifts)} по рекомендации — это ${t(G.kg_opt)} вместо ${t(G.kg_current)}.`;
+    } else if (n == null) {
+      verdict = `Даже по 3 человека на каждой точке модель ждёт не больше ${t(max)}, `
+        + (p > 0.5 ? `а чтобы собрать ${t(target)}${confTxt}, нужно в среднем ${t(mean)}. ` : `а цель — ${t(target)}. `)
+        + "Нужны новые магазины или более длинные часы — или цель поскромнее.";
+    } else {
+      verdict = `Для цели ${t(target)}${confTxt}: переставить нынешних людей по рекомендации и добавить ${shiftsTxt(n)} — `
+        + `это +${pct(n / G.shifts, 0)} к ${fmt(G.shifts)} сменам ноября.`;
+    }
+    $("goal-verdict").textContent = verdict;
+    const nn = n ?? cum.length;
+    const gain = nn ? cum[nn - 1] : 0, gainAlt = nn ? cumAlt[nn - 1] : 0;
+    $("goal-need").textContent = n == null ? `${fmt(cum.length)}+` : fmt(n);
+    $("goal-need-sub").textContent = n == null ? "все свободные места на точках — и всё равно мало" : n ? `≈ ${fmt(n / 2, 0)} человек, если каждый выходит оба дня` : "хватит нынешних людей";
+    $("goal-kg").textContent = t(G.kg_opt + gain);
+    $("goal-kg-sub").textContent = `≈ ${fmt((G.kg_opt + gain) / 6)} наборов` + (gain ? `; из них +${t(gain)} — новые смены` : "");
+    $("goal-alt").textContent = nn ? `+${t(gainAlt)}` : "—";
+    $("goal-alt-sub").textContent = !nn ? "новые смены не нужны"
+      : nAlt == null ? "вместо " + `+${t(gain)}; до цели не хватит даже всех свободных мест`
+      : `вместо +${t(gain)}; для цели понадобится ${shiftsTxt(nAlt)}`;
+    chart(nn, mean);
+    // где добавлять
+    const add = new Map();
+    for (let i = 0; i < nn; i++) { const [ri, g] = G.steps[i]; add.set(ri, (add.get(ri) || { n: 0, kg: 0 })); const a = add.get(ri); a.n += 1; a.kg += g / 10; }
+    const byCity = new Map();
+    add.forEach((a, ri) => { const r = rows[ri]; const c = byCity.get(r.city) || { city: r.city, n: 0, kg: 0, points: 0 };
+      c.n += a.n; c.kg += a.kg; c.points += 1; byCity.set(r.city, c); });
+    const list = [...byCity.values()].sort((a, b) => b.n - a.n || b.kg - a.kg);
+    $("goal-where-sub").textContent = nn ? `${fmt(list.length)} ${plural(list.length, "город", "города", "городов")}, ${fmt(add.size)} ${plural(add.size, "точка", "точки", "точек")}; первые 12 городов по числу новых смен — остальные в CSV.` : "";
+    $("goal-table").hidden = !nn; $("goal-csv").hidden = !nn; $("goal-where-sub").parentElement.hidden = !nn;
+    if (!nn) return;
+    table($("goal-table"), [
+      { title: "Город", key: "city" },
+      { title: "Новых смен", num: true, render: (r) => fmt(r.n) },
+      { title: "Точек", num: true, render: (r) => fmt(r.points) },
+      { title: "+ кг", num: true, render: (r) => fmt(r.kg) },
+    ], list.slice(0, 12));
+    if (csvUrl) URL.revokeObjectURL(csvUrl);
+    const cell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+    const head = ["город", "дата", "начало", "конец", "магазин", "сеть", "людей_по_рекомендации", "людей_с_новыми", "прибавка_кг"];
+    const body = [...add.entries()].sort((a, b) => a[0] - b[0]).map(([ri, a]) => { const r = rows[ri];
+      return [r.city, r.date, r.start, r.end, r.address, r.chain, r.v_opt, r.v_opt + a.n, a.kg.toFixed(1)].map(cell).join(","); });
+    csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
+    $("goal-csv").href = csvUrl; $("goal-csv").download = `новые_смены_цель_${goalT}т.csv`;
+  }
+
+  coordData.then((D) => {
+    if (!D.goal) { status.textContent = "Нет данных для цели — пересоберите scripts/build.py."; return; }
+    G = D.goal;
+    rows = D.rows.map((v) => Object.fromEntries(D.fields.map((f, i) => [f, v[i]])));
+    let a = 0, b = 0;
+    cum = G.steps.map((x) => (a += x[1] / 10));
+    cumAlt = G.steps.map((x) => (b += x[2] / 10));
+    const want = Number(new URL(location.href).searchParams.get("goal"));
+    input.value = want > 0 ? want : Math.round(G.kg_current * 1.1 / 1000);
+    show();
+  }).catch((e) => { status.textContent = `Не удалось загрузить данные (${e.message}).`; status.classList.add("err"); });
+  input.addEventListener("input", show);
+  conf.addEventListener("change", show);
 })();

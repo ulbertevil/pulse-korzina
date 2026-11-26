@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Пульс «Корзины доброты»</title>
+  <script>/* ошибки страницы — в атрибут: их проверяет автотест tests/test_site_smoke.py */
+    (function () { const d = document.documentElement, add = (m) => { d.dataset.jsErrors = (d.dataset.jsErrors || "") + m + "; "; };
+      addEventListener("error", (e) => add(e.message || "не загрузился " + ((e.target && (e.target.src || e.target.href)) || "ресурс")), true);
+      addEventListener("unhandledrejection", (e) => add(String(e.reason && e.reason.message || e.reason))); })();</script>
   <meta name="description" content="Прогноз сборов, расстановка волонтёров и A/B-эксперимент для акции «Корзина доброты» фонда X5 «Выручаем».">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ru_RU">
@@ -38,7 +42,7 @@
         <a class="role" href="#implement"><strong>Аналитику фонда</strong><span>как подключить свои данные и проверить идею</span></a>
       </div>
       <nav class="toc" aria-label="Разделы">
-        <a href="#next">Прогноз</a><a href="#upload">Свои данные</a><a href="#volunteers">Волонтёры</a><a href="#city">Мой город</a><a href="#below">Ниже ожидаемого</a>
+        <a href="#next">Прогноз</a><a href="#upload">Свои данные</a><a href="#volunteers">Волонтёры</a><a href="#goal">Цель</a><a href="#city">Мой город</a><a href="#below">Ниже ожидаемого</a>
         <a href="#accuracy">Точность</a><a href="#reality">Реальность</a><a href="#ab">A/B</a><a href="#implement">Внедрение</a><a href="#method">Методика</a>
       </nav>
     </div>
@@ -128,6 +132,39 @@
         </div>
       </div>
       <p class="note">Эффект волонтёра в модели оценён по наблюдениям. На реальных данных он может быть завышен, если волонтёров ставят в и без того сильные магазины. Проверить его честно поможет <a href="#ab">эксперимент</a>.</p>
+    </section>
+
+    <section id="goal" class="section">
+      <h2>Сколько людей нужно для цели</h2>
+      <p class="section-lede">Задайте цель акции — увидите, сколько смен волонтёров добавить и в какие города. Смена — один человек у точки на все её часы в этот день. Сначала нынешние люди расставляются по рекомендации, новые добавляются туда, где дадут больше всего.</p>
+      <div class="card goal">
+        <div class="goal-controls">
+          <label class="field">Цель, тонн
+            <input id="goal-t" type="number" min="1" max="1000" step="1" inputmode="numeric"></label>
+          <label class="field">Насколько уверенно
+            <select id="goal-conf">
+              <option value="0.5">В среднем — как прогноз</option>
+              <option value="0.8">Чтобы получилось в 8 акциях из 10</option>
+              <option value="0.9">Чтобы получилось в 9 акциях из 10</option>
+            </select></label>
+        </div>
+        <p class="status" id="goal-status" role="status" aria-live="polite"></p>
+        <div id="goal-body" hidden>
+          <div class="tiles">
+            <div class="tile"><p class="label">Добавить смен</p><p class="tile-value" id="goal-need">—</p><p class="sub" id="goal-need-sub"></p></div>
+            <div class="tile"><p class="label">Ожидаем собрать</p><p class="tile-value" id="goal-kg">—</p><p class="sub" id="goal-kg-sub"></p></div>
+            <div class="tile"><p class="label">Если волонтёр помогает вдвое меньше</p><p class="tile-value" id="goal-alt">—</p><p class="sub" id="goal-alt-sub"></p></div>
+          </div>
+          <p class="goal-verdict" id="goal-verdict"></p>
+          <div class="card-head"><h3>Сбор при новых сменах</h3><p class="sub">По горизонтали — сколько смен добавить, по вертикали — ожидаемый сбор. Каждая следующая смена даёт чуть меньше предыдущей: лучшие точки заполняются первыми.</p></div>
+          <div class="legend" id="goal-legend"></div>
+          <div class="chart" id="goal-chart" data-label="Ожидаемый сбор в зависимости от числа новых смен"></div>
+          <div class="card-head goal-where"><h3>Куда добавить</h3><p class="sub" id="goal-where-sub"></p></div>
+          <div id="goal-table" class="scroll"></div>
+          <a class="download" id="goal-csv" download>Скачать список точек (CSV)</a>
+        </div>
+      </div>
+      <p class="note">Это ожидаемые килограммы по модели на синтетике; «уверенно» учитывает разброс суммы по сети на прошлых акциях. Эффект волонтёра оценён по наблюдениям — поэтому рядом показан осторожный вариант, а измерить эффект честно поможет <a href="#ab">эксперимент</a>. Больше 3 человек на точку модель не ставит: таких данных не было.</p>
     </section>
 
     <section id="city" class="section">
@@ -260,7 +297,7 @@
         <li><strong>После акции.</strong> Загрузить новую выгрузку: план-факт покажет магазины ниже ожидаемого — с ними стоит разобраться (не было волонтёров? неудачное место короба?). Прогноз следующей акции обновится сам.</li>
         <li><strong>На следующей акции — эксперимент.</strong> Выбрать одну идею (например, «+1 волонтёр»), взять список «тест / контроль» из <a href="#ab">калькулятора</a> и после акции измерить эффект. Это заменит допущения модели о волонтёрах настоящим числом.</li>
       </ol>
-      <p class="note">Код открыт: <a href="https://github.com/ulbertevil/pulse-korzina" rel="noopener" target="_blank">github.com/ulbertevil/pulse-korzina</a>, 52 автотеста, подробный план внедрения — в <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/implementation.md" rel="noopener" target="_blank">docs/implementation.md</a>. Страницу можно разместить на любом хостинге фонда.</p>
+      <p class="note">Код открыт: <a href="https://github.com/ulbertevil/pulse-korzina" rel="noopener" target="_blank">github.com/ulbertevil/pulse-korzina</a>, 61 автотест (включая проверку сайта в браузере), подробный план внедрения — в <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/implementation.md" rel="noopener" target="_blank">docs/implementation.md</a>. Страницу можно разместить на любом хостинге фонда.</p>
     </section>
 
     <section id="method" class="section">

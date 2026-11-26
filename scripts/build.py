@@ -123,7 +123,11 @@ def main() -> None:
             "stress": stress.round(4).to_dict(orient="records")}
     (rep / "reality.json").write_text(json.dumps(real, ensure_ascii=False, indent=2), encoding="utf-8")
     site["reality"] = real
-    coord = site_export.coordinator(alloc, per_store)
+    coord = site_export.coordinator(alloc, per_store, b, sd)
+    gl = coord["goal"]
+    need = allocate.shifts_for_target(allocate.extra_steps(alloc, b), gl["kg_opt"], 160_000)
+    print(f"цель: максимум {(gl['kg_opt'] + sum(x[1] for x in gl['steps']) / 10) / 1000:.1f} т при 3 людях на точке; "
+          f"для 160 т в среднем нужно ещё {need} смен")
     coord.update({"action": A, "dates": sorted(plan["date"].unique().tolist())})
     (ROOT / "site/data").mkdir(parents=True, exist_ok=True)
     (ROOT / "site/data/coordinator.json").write_text(json.dumps(coord, ensure_ascii=False, separators=(",", ":")),

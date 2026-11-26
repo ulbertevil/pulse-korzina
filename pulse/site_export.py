@@ -121,7 +121,7 @@ def write(out_dir: Path, data: dict, csv_files: dict[str, Path]) -> None:
 COORD_FIELDS = ["city", "address", "chain", "date", "start", "end", "v_current", "v_opt", "kg_current", "kg_opt", "hi80"]
 
 
-def coordinator(alloc: pd.DataFrame, per_store: pd.DataFrame) -> dict:
+def coordinator(alloc: pd.DataFrame, per_store: pd.DataFrame, b=None, sigma: float = 0.0) -> dict:
     """План для координатора города: слоты «магазин × день» с людьми и ожидаемыми кг.
 
     hi80 — верхняя граница 80% интервала для слота (на сколько кг готовить тару):
@@ -131,7 +131,25 @@ def coordinator(alloc: pd.DataFrame, per_store: pd.DataFrame) -> dict:
     s = alloc.copy()
     s["hi80"] = s["kg_opt"] * s["store_id"].map(ratio).fillna(1.5)
     s["address"] = s["address"].map(short_address)
-    s = s.sort_values(["city", "date", "start", "address"])
+    s = s.sort_values(["city", "date", "start", "address"], kind="stable").reset_index(drop=True)
     rows = [[r.city, r.address, r.chain, r.date, int(r.start), int(r.end), int(r.v_current), int(r.v_opt),
              _r(r.kg_current), _r(r.kg_opt), _r(r.hi80)] for r in s.itertuples()]
-    return {"fields": COORD_FIELDS, "synthetic": True, "rows": rows}
+    out = {"fields": COORD_FIELDS, "synthetic": True, "rows": rows}
+    if b is not None:
+        out["goal"] = goal(s, b, sigma)
+    return out
+
+
+def goal(s: pd.DataFrame, b, sigma: float) -> dict:
+    """Данные для «Сколько людей нужно для цели»: новые смены по убыванию прироста.
+
+    steps — [номер строки листа координатора, прирост кг × 10, прирост при эффекте вдвое меньше × 10].
+    """
+    from .allocate import extra_steps
+    row = pd.Series(range(len(s)), index=pd.MultiIndex.from_frame(s[["store_id", "date"]]))
+    st = extra_steps(s, b)
+    idx = row.reindex(pd.MultiIndex.from_frame(st[["store_id", "date"]])).to_numpy()
+    steps = [[int(i), int(round(g * 10)), int(round(ga * 10))]
+             for i, g, ga in zip(idx, st["gain_kg"], st["gain_alt_kg"])]
+    return {"kg_current": _r(s["kg_current"].sum()), "kg_opt": _r(s["kg_opt"].sum()),
+            "shifts": int(s["v_opt"].sum()), "sigma": round(float(sigma), 4), "alt_scale": 0.5, "steps": steps}

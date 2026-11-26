@@ -147,6 +147,38 @@ def compare(slots: pd.DataFrame, budget: pd.Series, current: pd.Series, b: np.nd
     return s, summary
 
 
+def extra_steps(s: pd.DataFrame, b: np.ndarray, alt_scale: float = 0.5) -> pd.DataFrame:
+    """Дополнительные смены сверх рекомендованной расстановки — в порядке убывания прироста.
+
+    s — таблица из compare (base_kg, v_opt). Кандидаты — «слот × k-й волонтёр» для k > v_opt.
+    Внутри слота приросты убывают по k, а рекомендованная расстановка в каждом (город, день) —
+    это лучшие кандидаты при её бюджете. Поэтому первые N строк — точный максимум прироста
+    при N новых сменах по всей сети. gain_alt_kg — прирост тех же смен, если эффект волонтёра
+    в alt_scale раз от оценённого (осторожный сценарий).
+    """
+    m = multiplier(np.arange(len(b) + 1), b)
+    ma = multiplier(np.arange(len(b) + 1), b * alt_scale)
+    rows = []
+    for k in range(1, len(b) + 1):
+        g = s.loc[s["v_opt"] < k, ["store_id", "date", "city", "base_kg"]].copy()
+        g["k"] = k
+        g["gain_kg"] = g["base_kg"] * (m[k] - m[k - 1])
+        g["gain_alt_kg"] = g["base_kg"] * (ma[k] - ma[k - 1])
+        rows.append(g)
+    c = pd.concat(rows, ignore_index=True)
+    c = c[c["gain_kg"] > 0]
+    return c.sort_values(["gain_kg", "k"], ascending=[False, True], kind="stable").reset_index(drop=True)
+
+
+def shifts_for_target(steps: pd.DataFrame, start_kg: float, target_kg: float) -> int | None:
+    """Сколько новых смен нужно, чтобы ожидаемый сбор дошёл до цели; None — недостижимо."""
+    if target_kg <= start_kg:
+        return 0
+    cum = start_kg + steps["gain_kg"].cumsum().to_numpy()
+    i = int(np.searchsorted(cum, target_kg))
+    return i + 1 if i < len(cum) else None
+
+
 def city_summary(s: pd.DataFrame) -> pd.DataFrame:
     g = s.groupby("city").agg(stores=("store_id", "nunique"), shifts=("v_opt", "sum"),
                               kg_current=("kg_current", "sum"), kg_opt=("kg_opt", "sum"))

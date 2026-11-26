@@ -180,6 +180,11 @@ td .muted { color: var(--muted); }
 .field { display: grid; gap: 4px; font-size: 14px; color: var(--ink-2); }
 .field input, .field select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
 .coord-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.goal-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; align-items: end; max-width: 640px; }
+@media (max-width: 700px) { .goal-controls { grid-template-columns: minmax(0, 1fr); } }
+.goal-verdict { margin: 16px 0 18px; max-width: 820px; }
+.goal-where { margin-top: 18px; }
 .btn-2 { background: transparent; color: var(--accent); border: 1px solid var(--accent); text-decoration: none; display: inline-block; }
 .coord .tiles { margin: 6px 0 16px; }
 .print-title { margin: 8px 0 12px; }

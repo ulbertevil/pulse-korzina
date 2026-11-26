@@ -73,3 +73,33 @@ def test_optimal_not_worse_than_uniform_or_current():
     _, summ = allocate.compare(s, budget, current, B)
     assert summ["kg"]["opt"] >= summ["kg"]["uniform"] - 1e-9
     assert summ["kg"]["opt"] >= summ["kg"]["current"] - 1e-9
+
+
+@pytest.mark.parametrize("nx, ny, extra", [(0, 0, 3), (2, 1, 1), (3, 1, 4), (5, 0, 6), (9, 3, 2)])
+def test_extra_shifts_match_brute_force(nx, ny, extra):
+    """Первые N «дополнительных смен» = лучший результат, если люди города остаются в городе, а N новых — где угодно."""
+    s = toy_slots()
+    n = {"X": nx, "Y": ny}
+    budget = pd.Series({("X", "2026-12-10"): nx, ("Y", "2026-12-10"): ny})
+    s["v_opt"] = allocate.optimize(s, budget, B).to_numpy()
+    start = allocate.expected_kg(s, s.set_index(["store_id", "date"])["v_opt"], B).sum()
+    steps = allocate.extra_steps(s, B)
+    got = start + steps["gain_kg"].head(extra).sum()
+    best = 0.0
+    for v in itertools.product(range(allocate.MAX_PER_SLOT + 1), repeat=len(s)):
+        v = np.array(v)
+        over = sum(max(0, v[(s["city"] == c).to_numpy()].sum() - k) for c, k in n.items())
+        if over <= extra:
+            best = max(best, (s["base_kg"].to_numpy() * allocate.multiplier(v, B)).sum())
+    assert got == pytest.approx(best)
+
+
+def test_shifts_for_target():
+    s = toy_slots().assign(v_opt=0)
+    steps = allocate.extra_steps(s, B)
+    start = s["base_kg"].sum()
+    assert allocate.shifts_for_target(steps, start, start - 1) == 0
+    assert allocate.shifts_for_target(steps, start, start + steps["gain_kg"].iloc[0]) == 1
+    assert allocate.shifts_for_target(steps, start, start + steps["gain_kg"].iloc[:2].sum() + 0.01) == 3
+    assert allocate.shifts_for_target(steps, start, start + steps["gain_kg"].sum() + 1) is None
+    assert (steps["gain_alt_kg"] < steps["gain_kg"]).all()
