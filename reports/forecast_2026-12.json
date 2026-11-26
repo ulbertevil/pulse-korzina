@@ -1,0 +1,63 @@
+{
+  "action_id": "2026-12",
+  "stores": 1740,
+  "pred_kg": 138064.19456079032,
+  "lo80_kg": 119875.05332121426,
+  "hi80_kg": 159013.24997656047,
+  "lo95_kg": 111237.88318715978,
+  "hi95_kg": 171359.9834298183,
+  "net_log_sd": 0.11022844644344318,
+  "kappa": 25,
+  "coef": {
+    "const": 1.4746,
+    "season_summer": -0.2387,
+    "season_autumn": -0.0218,
+    "season_november": 0.1515,
+    "t_years": 0.0364,
+    "log_hours": 1.1161,
+    "share_thu": -0.0743,
+    "share_sat": 0.0,
+    "share_sun": -1.2548,
+    "vol_ge1": 0.3791,
+    "vol_ge2": 0.1356,
+    "vol_ge3": 0.0665,
+    "chain_perekrestok": 0.3051,
+    "log_city_stores": -0.0646
+  },
+  "sets": 23010.699093465053,
+  "backtest": [
+    {
+      "model": "glm_eb",
+      "wape": 0.294,
+      "network_ape": 0.0746,
+      "bias": -0.0599,
+      "mape_store": 0.3265,
+      "wape_vs_naive": -0.2501
+    },
+    {
+      "model": "ses",
+      "wape": 0.3398,
+      "network_ape": 0.1668,
+      "bias": -0.043,
+      "mape_store": 0.3738,
+      "wape_vs_naive": -0.1334
+    },
+    {
+      "model": "seasonal_naive",
+      "wape": 0.3738,
+      "network_ape": 0.0924,
+      "bias": -0.0501,
+      "mape_store": 0.4121,
+      "wape_vs_naive": -0.0467
+    },
+    {
+      "model": "naive",
+      "wape": 0.3921,
+      "network_ape": 0.1971,
+      "bias": -0.0411,
+      "mape_store": 0.4302,
+      "wape_vs_naive": 0.0
+    }
+  ],
+  "synthetic": true
+}
