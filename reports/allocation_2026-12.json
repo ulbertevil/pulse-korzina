@@ -1,0 +1,20 @@
+{
+  "shifts": 4207,
+  "shifts_used_opt": 4207,
+  "kg": {
+    "none": 97522.40828619215,
+    "current": 138063.7561986983,
+    "uniform": 145889.10680915407,
+    "opt": 149760.38384565525
+  },
+  "uplift_opt_vs_current": 0.08471903104043776,
+  "uplift_opt_vs_uniform": 0.026535751168628607,
+  "kg_per_shift_opt": 12.416918364502758,
+  "kg_per_shift_current": 9.636640815903531,
+  "vol_coef": [
+    0.3791,
+    0.1356,
+    0.0665
+  ],
+  "synthetic": true
+}

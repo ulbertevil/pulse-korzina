@@ -13,7 +13,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from pulse import backtest, features, forecast, synth  # noqa: E402
+from pulse import allocate, backtest, features, forecast, synth  # noqa: E402
+from pulse.models import GLMEB  # noqa: E402
 from pulse.stores import load_table  # noqa: E402
 
 RAW = ROOT / "data/raw/stores-2026-11.csv"
@@ -50,7 +51,8 @@ def main() -> None:
     plan = forecast.plan_from_slots(slots, NEXT_DATES, "2026-12", volunteers=vol)
     plan_agg = features.aggregate(plan, stores)
     sd = forecast.network_log_sd(res)
-    per_store, total = forecast.forecast(agg, plan_agg, sd)
+    model = GLMEB().fit(agg)
+    per_store, total = forecast.forecast(agg, plan_agg, sd, model=model)
     per_store.to_csv(rep / "forecast_2026-12_stores.csv", index=False)
     total["sets"] = forecast.kg_to_people(total["pred_kg"])["sets"]
     total["backtest"] = summ.round(4).reset_index().to_dict(orient="records")
@@ -58,6 +60,24 @@ def main() -> None:
     (rep / "forecast_2026-12.json").write_text(json.dumps(total, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"прогноз 10–11.12: {total['pred_kg']/1000:.1f} т "
           f"(95%: {total['lo95_kg']/1000:.1f}–{total['hi95_kg']/1000:.1f} т), ≈{total['sets']:.0f} наборов")
+
+    # Расстановка волонтёров на ту же акцию: те же люди, что в ноябре, по городам и дням
+    b = allocate.vol_coefs(model.coef())
+    zero = plan_agg.assign(**{f"v{k}": 0.0 for k in features.VOL_LEVELS})
+    pred0 = pd.Series(model.predict(zero), index=plan_agg["store_id"].to_numpy())
+    slots_dec = allocate.slot_table(plan, pred0, allocate.hour_weights(hourly, b), stores)
+    current = plan.groupby(["store_id", "date"])["volunteers"].first()
+    budget = (slots_dec.assign(v=current.reindex(pd.MultiIndex.from_frame(slots_dec[["store_id", "date"]])).to_numpy())
+              .groupby(["city", "date"])["v"].sum())
+    alloc, alloc_sum = allocate.compare(slots_dec, budget, current, b)
+    alloc.to_csv(rep / "allocation_2026-12_slots.csv", index=False)
+    allocate.city_summary(alloc).to_csv(rep / "allocation_2026-12_cities.csv")
+    alloc_sum["synthetic"] = True
+    (rep / "allocation_2026-12.json").write_text(json.dumps(alloc_sum, ensure_ascii=False, indent=2),
+                                                  encoding="utf-8")
+    print(f"расстановка: {alloc_sum['shifts']} смен; оптимально +{alloc_sum['uplift_opt_vs_current']:.1%} "
+          f"к «как в ноябре», +{alloc_sum['uplift_opt_vs_uniform']:.1%} к «поровну»; "
+          f"кг на смену {alloc_sum['kg_per_shift_current']:.1f} → {alloc_sum['kg_per_shift_opt']:.1f}")
 
 
 if __name__ == "__main__":

@@ -28,9 +28,10 @@ def plan_from_slots(slots: pd.DataFrame, dates: list[str], action_id: str,
     return plan
 
 
-def forecast(history: pd.DataFrame, plan_agg: pd.DataFrame, net_log_sd: float) -> tuple[pd.DataFrame, dict]:
-    """Обучить GLMEB на всей истории и спрогнозировать план. Возвращает (магазины, итог)."""
-    model = GLMEB().fit(history)
+def forecast(history: pd.DataFrame, plan_agg: pd.DataFrame, net_log_sd: float,
+             model: GLMEB | None = None) -> tuple[pd.DataFrame, dict]:
+    """Спрогнозировать план моделью GLMEB (обучается на истории, если не передана)."""
+    model = model or GLMEB().fit(history)
     p = model.predict(plan_agg)
     q = backtest.store_ratio_quantiles(history)
     out = plan_agg[["action_id", "store_id", "region", "city", "chain", "hours", "vol_hours"]].assign(
