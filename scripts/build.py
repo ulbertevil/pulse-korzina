@@ -109,6 +109,10 @@ def main() -> None:
             "stress": stress.round(4).to_dict(orient="records")}
     (rep / "reality.json").write_text(json.dumps(real, ensure_ascii=False, indent=2), encoding="utf-8")
     site["reality"] = real
+    coord = site_export.coordinator(alloc, per_store)
+    (ROOT / "site/data").mkdir(parents=True, exist_ok=True)
+    (ROOT / "site/data/coordinator.json").write_text(json.dumps(coord, ensure_ascii=False, separators=(",", ":")),
+                                                     encoding="utf-8")
     site_export.write(ROOT / "site/data", site, {
         "experiment_2026-12_assignment.csv": rep / "experiment_2026-12_assignment.csv",
         "allocation_2026-12_slots.csv": rep / "allocation_2026-12_slots.csv",

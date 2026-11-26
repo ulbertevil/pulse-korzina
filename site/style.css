@@ -173,3 +173,30 @@ td .muted { color: var(--muted); }
 .chart .dot.anchor { fill: var(--muted); }
 .chart .stem.anchor { stroke: var(--muted); }
 .prereg { border-left: 3px solid var(--accent); }
+
+.coord-controls { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+@media (max-width: 700px) { .coord-controls { grid-template-columns: minmax(0, 1fr); } }
+.field { display: grid; gap: 4px; font-size: 14px; color: var(--ink-2); }
+.field input, .field select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.coord-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-2 { background: transparent; color: var(--accent); border: 1px solid var(--accent); text-decoration: none; display: inline-block; }
+.coord .tiles { margin: 6px 0 16px; }
+.print-title { margin: 8px 0 12px; }
+.move { font-weight: 600; }
+.move.up { color: var(--accent); }
+.move.down { color: var(--ink-2); }
+tr.day-break td { border-top: 2px solid var(--axis); }
+@media print {
+  body.print-city header.top, body.print-city footer, body.print-city .tooltip,
+  body.print-city main > section:not(#city), body.print-city .no-print, body.print-city #city > h2,
+  body.print-city #city > .section-lede { display: none !important; }
+  body.print-city {
+    --ink: #111; --ink-2: #333; --muted: #555; --surface: #fff; --page: #fff; --grid: #ccc; --axis: #999;
+    --accent: #1a5fb4; --border: #ccc; background: #fff; color: #111;
+  }
+  body.print-city th { background: #fff !important; color: #111; }
+  body.print-city .card { border: 0; box-shadow: none; padding: 0; background: #fff; }
+  body.print-city .scroll { overflow: visible; }
+  body.print-city th, body.print-city td { color: #000; padding: 4px 6px; }
+  body.print-city tr { break-inside: avoid; }
+}

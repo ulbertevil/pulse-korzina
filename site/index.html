@@ -21,7 +21,7 @@
         Свою выгрузку можно <a href="#upload">загрузить прямо на странице</a>: расчёт пройдёт в браузере.
       </div>
       <nav class="toc" aria-label="Разделы">
-        <a href="#next">Прогноз</a><a href="#upload">Свои данные</a><a href="#volunteers">Волонтёры</a><a href="#below">Ниже ожидаемого</a>
+        <a href="#next">Прогноз</a><a href="#upload">Свои данные</a><a href="#volunteers">Волонтёры</a><a href="#city">Мой город</a><a href="#below">Ниже ожидаемого</a>
         <a href="#accuracy">Точность</a><a href="#reality">Реальность</a><a href="#ab">A/B</a><a href="#method">Методика</a>
       </nav>
     </div>
@@ -110,6 +110,35 @@
         </div>
       </div>
       <p class="note">Эффект волонтёра в модели оценён по наблюдениям. На реальных данных он может быть завышен, если волонтёров ставят в и без того сильные магазины. Проверить его честно поможет <a href="#ab">эксперимент</a>.</p>
+    </section>
+
+    <section id="city" class="section">
+      <h2>План для координатора города</h2>
+      <p class="section-lede">Выберите свой город — получите лист на акцию 10–11 декабря: какие магазины, в какие часы, сколько людей поставить и сколько килограммов ждать. Лист можно распечатать или скачать.</p>
+      <div class="card coord">
+        <div class="coord-controls no-print">
+          <label class="field">Город
+            <input id="city-input" list="city-list" autocomplete="off" placeholder="Начните вводить: Казань…"></label>
+          <datalist id="city-list"></datalist>
+          <label class="field">День
+            <select id="city-day"><option value="">Оба дня</option></select></label>
+          <div class="coord-actions">
+            <button type="button" class="btn" id="city-print">Распечатать</button>
+            <a href="#" class="btn btn-2" id="city-csv">Скачать CSV</a>
+          </div>
+        </div>
+        <p class="status" id="city-status" role="status" aria-live="polite"></p>
+        <div id="city-sheet" hidden>
+          <h3 class="print-title" id="city-title"></h3>
+          <div class="tiles">
+            <div class="tile"><p class="label">Магазинов</p><p class="tile-value" id="city-stores">—</p><p class="sub" id="city-slots"></p></div>
+            <div class="tile"><p class="label">Смен волонтёров</p><p class="tile-value" id="city-shifts">—</p><p class="sub" id="city-moves"></p></div>
+            <div class="tile"><p class="label">Ожидаем собрать</p><p class="tile-value" id="city-kg">—</p><p class="sub" id="city-gain"></p></div>
+          </div>
+          <div id="city-table" class="scroll"></div>
+          <p class="note">Люди — сколько волонтёров стоит у точки всю смену. «Было» — как в ноябре, «надо» — рекомендация: те же люди города, переставленные туда, где они дают больше. «Тара до» — верхняя граница 80% прогноза: столько коробок и машин стоит предусмотреть. <strong>Килограммы и ноябрьские люди — синтетика</strong>; магазины и часы — из таблицы фонда. На выгрузке фонда лист пересчитается.</p>
+        </div>
+      </div>
     </section>
 
     <section id="below" class="section">

@@ -518,3 +518,75 @@ fetch("data/dashboard.json")
       .catch((e) => say(`Демо-выгрузка не найдена (${e.message}). Запустите scripts/build.py.`, true));
   });
 })();
+
+// ---------- План для координатора города ----------
+(function cityPlan() {
+  const input = $("city-input"), daySel = $("city-day"), status = $("city-status");
+  let rows = [], cities = new Map(), byNorm = new Map(), csvUrl = null;
+  const norm = (x) => String(x || "").toLowerCase().replace(/ё/g, "е").replace(/[\s,]+(г|город)\.?$/, "").replace(/\s+/g, " ").trim();
+  const resolve = (x) => (cities.has(x) ? x : byNorm.get(norm(x)));
+  const store = { get: () => { try { return localStorage.getItem("pulse.city"); } catch { return null; } },
+    set: (v) => { try { localStorage.setItem("pulse.city", v); } catch { /* приватный режим */ } } };
+
+  function show(raw) {
+    const city = resolve(raw), all = cities.get(city);
+    if (!all) { $("city-sheet").hidden = true; status.textContent = city ? "Такого города нет в акции — выберите из списка." : ""; return; }
+    status.textContent = "";
+    if (input.value !== city) input.value = city;
+    store.set(city);
+    const u = new URL(location.href); u.searchParams.set("city", city); history.replaceState(null, "", u);
+    const day = daySel.value, list = day ? all.filter((r) => r.date === day) : all;
+    const sum = (k) => list.reduce((a, r) => a + r[k], 0);
+    const moved = list.filter((r) => r.v_opt !== r.v_current).length;
+    $("city-title").textContent = `${city} · акция ${day ? dateShort(day) : "10–11 декабря"}`;
+    $("city-stores").textContent = fmt(new Set(list.map((r) => r.address)).size);
+    $("city-slots").textContent = `${fmt(list.length)} смен магазинов (магазин × день)`;
+    $("city-shifts").textContent = fmt(sum("v_opt"));
+    $("city-moves").textContent = moved ? `в ${fmt(moved)} из ${fmt(list.length)} точек число людей меняется` : "рекомендация совпадает с ноябрём";
+    $("city-kg").textContent = sum("kg_opt") >= 1000 ? tons(sum("kg_opt")) : `${fmt(sum("kg_opt"))} кг`;
+    const g = sum("kg_opt") / sum("kg_current") - 1;
+    $("city-gain").textContent = `≈ ${fmt(sum("kg_opt") / 6)} наборов; ${Math.abs(g) < 0.0005 ? "как при ноябрьской расстановке" : signedPct(g) + " к ноябрьской расстановке"}`;
+    const cols = [
+      ...(day ? [] : [{ title: "День", render: (r) => dateShort(r.date) }]),
+      { title: "Часы", render: (r) => `${r.start}:00–${r.end}:00` },
+      { title: "Магазин", render: (r) => el("span", {}, r.address, el("br"), el("span", { class: "muted", text: r.chain })) },
+      { title: "Людей: было → надо", num: true, render: (r) => {
+        if (r.v_opt === r.v_current) return String(r.v_opt);
+        return el("span", { class: "move " + (r.v_opt > r.v_current ? "up" : "down"), text: `${r.v_current} → ${r.v_opt}` }); } },
+      { title: "Ожидаем, кг", num: true, render: (r) => fmt(r.kg_opt) },
+      { title: "Тара до, кг", num: true, render: (r) => fmt(r.hi80) },
+    ];
+    table($("city-table"), cols, list);
+    $("city-table").querySelectorAll("tbody tr").forEach((tr, i) => {
+      if (i > 0 && list[i].date !== list[i - 1].date) tr.classList.add("day-break");
+    });
+    if (csvUrl) URL.revokeObjectURL(csvUrl);
+    const cell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+    const head = ["город", "дата", "начало", "конец", "магазин", "сеть", "людей_было", "людей_надо", "ожидаем_кг", "тара_до_кг"];
+    const body = list.map((r) => [city, r.date, r.start, r.end, r.address, r.chain, r.v_current, r.v_opt, r.kg_opt, r.hi80].map(cell).join(","));
+    csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
+    const a = $("city-csv"); a.href = csvUrl; a.download = `план_${city.replace(/[^\p{L}\d-]+/gu, "_")}_${day || "2026-12-10_11"}.csv`;
+    $("city-sheet").hidden = false;
+  }
+
+  fetch("data/coordinator.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((D) => {
+    rows = D.rows.map((v) => Object.fromEntries(D.fields.map((f, i) => [f, v[i]])));
+    rows.forEach((r) => { if (!cities.has(r.city)) cities.set(r.city, []); cities.get(r.city).push(r); });
+    const names = [...cities.keys()].sort((a, b) => cities.get(b).length - cities.get(a).length || a.localeCompare(b, "ru"));
+    names.forEach((n) => byNorm.set(norm(n), n));
+    $("city-list").replaceChildren(...names.map((n) => el("option", { value: n })));
+    [...new Set(rows.map((r) => r.date))].sort().forEach((d) => daySel.append(el("option", { value: d, text: dateShort(d) })));
+    const want = new URL(location.href).searchParams.get("city") || store.get();
+    show(resolve(want) || names[0]);
+  }).catch((e) => { status.textContent = `Не удалось загрузить план (${e.message}). Запустите scripts/build.py.`; status.classList.add("err"); });
+
+  input.addEventListener("change", () => show(input.value.trim()));
+  input.addEventListener("input", () => { if (cities.has(input.value.trim())) show(input.value.trim()); });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") show(input.value.trim()); });
+  daySel.addEventListener("change", () => show(input.value.trim()));
+  $("city-print").addEventListener("click", () => {
+    document.body.classList.add("print-city");
+    addEventListener("afterprint", () => document.body.classList.remove("print-city"), { once: true });
+    print();
+  });
+})();

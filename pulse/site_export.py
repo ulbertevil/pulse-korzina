@@ -116,3 +116,22 @@ def write(out_dir: Path, data: dict, csv_files: dict[str, Path]) -> None:
                                             encoding="utf-8")
     for name, src in csv_files.items():
         (out_dir / name).write_bytes(src.read_bytes())
+
+
+COORD_FIELDS = ["city", "address", "chain", "date", "start", "end", "v_current", "v_opt", "kg_current", "kg_opt", "hi80"]
+
+
+def coordinator(alloc: pd.DataFrame, per_store: pd.DataFrame) -> dict:
+    """План для координатора города: слоты «магазин × день» с людьми и ожидаемыми кг.
+
+    hi80 — верхняя граница 80% интервала для слота (на сколько кг готовить тару):
+    отношение hi80 / прогноз магазина переносится на слот.
+    """
+    ratio = (per_store["hi80"] / per_store["pred_kg"]).set_axis(per_store["store_id"])
+    s = alloc.copy()
+    s["hi80"] = s["kg_opt"] * s["store_id"].map(ratio).fillna(1.5)
+    s["address"] = s["address"].map(short_address)
+    s = s.sort_values(["city", "date", "start", "address"])
+    rows = [[r.city, r.address, r.chain, r.date, int(r.start), int(r.end), int(r.v_current), int(r.v_opt),
+             _r(r.kg_current), _r(r.kg_opt), _r(r.hi80)] for r in s.itertuples()]
+    return {"fields": COORD_FIELDS, "synthetic": True, "rows": rows}
