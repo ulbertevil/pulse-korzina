@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Пульс «Корзины доброты»</title>
   <meta name="description" content="Прогноз сборов, расстановка волонтёров и A/B-эксперимент для акции «Корзина доброты» фонда X5 «Выручаем».">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:site_name" content="Пульс «Корзины доброты»">
+  <meta property="og:title" content="Пульс «Корзины доброты»">
+  <meta property="og:description" content="Сколько соберём на акции, куда поставить волонтёров, лист для координатора каждого города и калькулятор эксперимента. Для фонда X5 «Выручаем».">
+  <meta property="og:url" content="https://ulbertevil.github.io/pulse-korzina/">
+  <meta property="og:image" content="https://ulbertevil.github.io/pulse-korzina/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Пульс «Корзины доброты»: прогноз сбора, наборы теми же волонтёрами, листы координаторов по городам">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M5 18h6l3-8 4 13 3-7h6' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -256,6 +267,7 @@
       <div class="stack">
         <div class="card prose">
           <h3>Как считается</h3>
+          <p class="sub">Подробно, с формулами, проверками и ограничениями — <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/methodology.md" rel="noopener" target="_blank">методика на одну страницу</a>.</p>
           <ul>
             <li><strong>Прогноз:</strong> лог-линейная модель (сезон, тренд, часы, дни недели, волонтёры с убывающей отдачей, сеть, размер города) × множитель магазина, сжатый к его региону. У нового магазина прогноз берётся по региону.</li>
             <li><strong>Интервалы</strong> — из реальных ошибок модели на прошлых акциях, а не из формулы.</li>

@@ -25,6 +25,9 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
       - run: python scripts/build.py
+      - name: Картинка-превью для ссылки
+        continue-on-error: true
+        run: python scripts/og_image.py
       - name: Версия файлов в ссылках, чтобы браузер не взял старый скрипт
         run: |
           V="${GITHUB_SHA::7}"
