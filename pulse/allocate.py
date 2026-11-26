@@ -45,18 +45,29 @@ def hour_weights(hourly: pd.DataFrame, b: np.ndarray) -> pd.Series:
     return w / w.mean()
 
 
+def hourly_split(plan: pd.DataFrame, pred: pd.Series, weights: pd.Series, b: np.ndarray | None = None) -> pd.DataFrame:
+    """Разложить прогноз магазина на акцию по его часам.
+
+    Доля часа ∝ weights(день недели, час) × множитель волонтёров этого часа (если b задан).
+    """
+    p = plan.copy()
+    p["wd"] = pd.to_datetime(p["date"]).dt.day_of_week
+    p["w"] = [weights.get((wd, h), np.nan) for wd, h in zip(p["wd"], p["hour"])]
+    p["w"] = p["w"].fillna(weights.mean())
+    if b is not None and "volunteers" in p:
+        p["w"] = p["w"] * multiplier(p["volunteers"], b)
+    p["share"] = p["w"] / p.groupby("store_id")["w"].transform("sum")
+    p["kg"] = p["share"] * p["store_id"].map(pred)
+    return p
+
+
 def slot_table(plan: pd.DataFrame, pred0: pd.Series, weights: pd.Series, stores: pd.DataFrame) -> pd.DataFrame:
     """Прогноз без волонтёров по слотам «магазин × день».
 
     pred0 — прогноз магазина на всю акцию при v=0 (Series по store_id);
     он раскладывается по часам пропорционально weights.
     """
-    p = plan[["store_id", "date", "hour"]].copy()
-    p["wd"] = pd.to_datetime(p["date"]).dt.day_of_week
-    p["w"] = [weights.get((wd, h), np.nan) for wd, h in zip(p["wd"], p["hour"])]
-    p["w"] = p["w"].fillna(weights.mean())
-    p["share"] = p["w"] / p.groupby("store_id")["w"].transform("sum")
-    p["base_kg"] = p["share"] * p["store_id"].map(pred0)
+    p = hourly_split(plan[["store_id", "date", "hour"]], pred0, weights).rename(columns={"kg": "base_kg"})
     s = p.groupby(["store_id", "date"]).agg(hours=("hour", "count"), start=("hour", "min"),
                                            end=("hour", "max"), base_kg=("base_kg", "sum")).reset_index()
     s["end"] += 1

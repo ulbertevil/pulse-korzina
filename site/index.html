@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Пульс «Корзины доброты»</title>
+  <meta name="description" content="Прогноз сборов, расстановка волонтёров и A/B-эксперимент для акции «Корзина доброты» фонда X5 «Выручаем».">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M5 18h6l3-8 4 13 3-7h6' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <p class="eyebrow">Фонд X5 «Выручаем» · акция «Корзина доброты»</p>
+      <h1>Пульс «Корзины доброты»</h1>
+      <p class="lede">Сколько соберём на следующей акции, в какие магазины поставить волонтёров и как проверить новую идею экспериментом.</p>
+      <div class="banner" role="note">
+        <strong>Демо на синтетических данных.</strong>
+        Магазины, города и часы акции — реальные, из <a id="src-table" href="#">таблицы фонда</a>.
+        Килограммы и волонтёры смоделированы и откалиброваны по одной публичной цифре фонда.
+        На выгрузке фонда все расчёты пересчитаются на реальных данных.
+      </div>
+      <nav class="toc" aria-label="Разделы">
+        <a href="#next">Прогноз</a><a href="#volunteers">Волонтёры</a><a href="#below">Ниже ожидаемого</a>
+        <a href="#accuracy">Точность</a><a href="#ab">A/B</a><a href="#method">Методика</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap" id="app" aria-busy="true">
+    <section id="next" class="section">
+      <h2 id="next-title">Следующая акция</h2>
+      <div class="hero card">
+        <div class="hero-main">
+          <p class="label">Прогноз сбора</p>
+          <p class="hero-value" id="kpi-tons">—</p>
+          <p class="sub" id="kpi-range"></p>
+        </div>
+        <div class="tiles">
+          <div class="tile"><p class="label">Магазинов</p><p class="tile-value" id="kpi-stores">—</p><p class="sub" id="kpi-geo"></p></div>
+          <div class="tile"><p class="label">Волонтёрских смен</p><p class="tile-value" id="kpi-shifts">—</p><p class="sub" id="kpi-shift-gain"></p></div>
+          <div class="tile">
+            <p class="label">Это примерно</p><p class="tile-value" id="kpi-portions">—</p>
+            <label class="sub select-label">
+              <span class="visually-hidden">Единица пересчёта</span>
+              <select id="portion-select"></select>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>Сбор по часам, вся сеть</h3>
+          <p class="sub">Прогноз при расстановке волонтёров «как в ноябре»; полоса — 80% интервал.</p>
+        </div>
+        <div class="legend" id="hourly-legend"></div>
+        <div class="chart" id="hourly-chart"></div>
+        <details class="table-view"><summary>Таблица</summary><div id="hourly-table"></div></details>
+      </div>
+    </section>
+
+    <section id="volunteers" class="section">
+      <h2>Куда ставить волонтёров</h2>
+      <p class="section-lede" id="vol-lede"></p>
+      <div class="stack">
+        <div class="card">
+          <div class="card-head"><h3>По городам</h3><p class="sub">Те же люди, что в ноябре; рекомендуемая расстановка.</p></div>
+          <div id="cities-table" class="scroll"></div>
+          <a class="download" id="dl-cities" download>Скачать все города (CSV)</a>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Где первый волонтёр даёт больше всего</h3><p class="sub">Прирост кг на волонтёро-час, топ слотов «магазин × день».</p></div>
+          <div id="ranking-table" class="scroll"></div>
+          <a class="download" id="dl-slots" download>Скачать план по всем слотам (CSV)</a>
+        </div>
+      </div>
+      <p class="note">Эффект волонтёра в модели оценён по наблюдениям. На реальных данных он может быть завышен, если волонтёров ставят в и без того сильные магазины. Проверить его честно поможет <a href="#ab">эксперимент</a>.</p>
+    </section>
+
+    <section id="below" class="section">
+      <h2>Ниже ожидаемого</h2>
+      <p class="section-lede" id="below-lede"></p>
+      <div class="card">
+        <div id="below-table" class="scroll"></div>
+      </div>
+    </section>
+
+    <section id="accuracy" class="section">
+      <h2>Насколько точен прогноз</h2>
+      <p class="section-lede">Бэктест: модель учится на прошлых акциях и прогнозирует следующую «вслепую», затем прогноз сравнивается с фактом.</p>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head"><h3>Сумма по сети: факт и прогнозы</h3><p class="sub">Полоса — 95% интервал модели.</p></div>
+          <div class="legend" id="steps-legend"></div>
+          <div class="chart" id="steps-chart"></div>
+          <details class="table-view"><summary>Таблица</summary><div id="steps-table"></div></details>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Ошибка по магазинам (WAPE)</h3><p class="sub">Чем короче, тем точнее; среднее по 5 шагам.</p></div>
+          <div class="chart" id="models-chart"></div>
+          <details class="table-view"><summary>Таблица</summary><div id="models-table"></div></details>
+        </div>
+      </div>
+      <p class="note">На синтетике это проверка того, что конвейер работает и модель находит заложенные эффекты, а не оценка точности на реальных данных: модель и синтетика устроены похоже, на настоящих данных ошибка будет выше.</p>
+    </section>
+
+    <section id="ab" class="section">
+      <h2>Калькулятор A/B-эксперимента</h2>
+      <p class="section-lede">Например: «+1 волонтёр в тестовых магазинах» или «новая табличка у короба». Магазины делятся на тест и контроль внутри групп похожих, а прогноз модели до акции вычитает предсказуемую часть разброса (CUPED).</p>
+      <div class="card ab">
+        <form class="ab-form" id="ab-form">
+          <label>Магазинов в эксперименте <output id="ab-n-out"></output>
+            <input type="range" id="ab-n" min="100" max="1740" step="20"></label>
+          <label>Доля теста <output id="ab-share-out"></output>
+            <input type="range" id="ab-share" min="0.1" max="0.9" step="0.05" value="0.5"></label>
+          <label>Ожидаемый эффект <output id="ab-eff-out"></output>
+            <input type="range" id="ab-eff" min="0.02" max="0.4" step="0.01" value="0.1"></label>
+          <div class="ab-row">
+            <label>Уровень значимости
+              <select id="ab-alpha"><option value="0.05">5%</option><option value="0.01">1%</option></select></label>
+            <label>Мощность
+              <select id="ab-power"><option value="0.8">80%</option><option value="0.9">90%</option></select></label>
+          </div>
+        </form>
+        <div class="ab-out">
+          <div class="ab-compare">
+            <div><p class="label">Минимальный заметный эффект</p>
+              <p class="tile-value" id="ab-mde">—</p><p class="sub" id="ab-mde-raw"></p></div>
+            <div><p class="label">Нужно магазинов для выбранного эффекта</p>
+              <p class="tile-value" id="ab-need">—</p><p class="sub" id="ab-need-raw"></p></div>
+          </div>
+          <p class="verdict" id="ab-verdict"></p>
+          <p class="sub" id="ab-check"></p>
+          <a class="download" id="dl-assign" download>Скачать список «тест / контроль» на акцию (CSV)</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="method" class="section">
+      <h2>Методика и источники</h2>
+      <div class="stack">
+        <div class="card prose">
+          <h3>Как считается</h3>
+          <ul>
+            <li><strong>Прогноз:</strong> лог-линейная модель (сезон, тренд, часы, дни недели, волонтёры с убывающей отдачей, сеть, размер города) × множитель магазина, сжатый к его региону. У нового магазина прогноз берётся по региону.</li>
+            <li><strong>Интервалы</strong> — из реальных ошибок модели на прошлых акциях, а не из формулы.</li>
+            <li><strong>Расстановка</strong> — выбор смен с наибольшим ожидаемым приростом при тех же людях в городе и дне; решение точное, тест сверяет его с полным перебором.</li>
+            <li><strong>A/B</strong> — стратифицированная рандомизация, CUPED, регрессия с робастной ошибкой; дизайн проверен 200 симуляциями A/A и A/B.</li>
+            <li><strong>Порции</strong> — разные методики дают разные числа, поэтому есть переключатель; стандартной российской методики нет.</li>
+          </ul>
+          <h3>Ограничения</h3>
+          <ul>
+            <li>Килограммы — синтетика. Реальная точность появится после загрузки выгрузки фонда «магазин × акция × кг».</li>
+            <li>Декабрьских акций в истории нет: декабрь моделируется как ноябрь — это допущение.</li>
+            <li>Коэффициент МГУ (20,55%) — только цитата фонда, в расчётах не используется: методика не опубликована.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Факты со ссылками</h3><p class="sub">Статус: первоисточник, СМИ, заявление фонда, не проверено, оценка.</p></div>
+          <div id="facts-table" class="scroll tall"></div>
+          <a class="download" id="dl-facts" download>Скачать facts.csv</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>Проект для конкурса X5 «Вайбкодинг добрых дел». Код и данные: <a href="https://github.com/ulbertevil/pulse-korzina">github.com/ulbertevil/pulse-korzina</a>. Неофициальный проект, не связан с X5 Group и фондом «Выручаем». <span id="generated"></span></p>
+  </footer>
+
+  <div class="tooltip" id="tooltip" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
