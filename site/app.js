@@ -418,6 +418,12 @@ function render(D) {
   $("app").setAttribute("aria-busy", "false");
 }
 
+// ?shot=city — показать один раздел (для скриншотов и ссылок «посмотреть только это»)
+{
+  const shot = new URLSearchParams(location.search).get("shot");
+  if (shot && document.getElementById(shot)) { document.body.classList.add("shot"); document.getElementById(shot).classList.add("shot-target"); }
+}
+
 fetch("data/dashboard.json")
   .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(render)
@@ -501,15 +507,14 @@ fetch("data/dashboard.json")
     demoBtn.disabled = true;
     say(`Читаем ${label}…`);
     const t0 = performance.now();
-    worker = new Worker("worker.js");
-    worker.onmessage = (e) => {
-      const m = e.data;
+    const nextDate = $("next-date").value || "2026-12-10";
+    const handle = (m) => {
       if (m.type === "report") { showReport(m.report); say("Обучаем модель…"); }
       else if (m.type === "progress") say(`Проверяем модель на прошлых акциях: ${m.i} из ${m.n}…`);
       else if (m.type === "error") { say(`Ошибка расчёта: ${m.message}`, true); demoBtn.disabled = false; }
       else if (m.type === "done") {
         demoBtn.disabled = false;
-        worker.terminate(); worker = null;
+        if (worker) { worker.terminate(); worker = null; }
         const R = m.result;
         if (!R) { say("Файл не подходит: см. проверку ниже.", true); return; }
         if (R.error) { say(R.error, true); return; }
@@ -517,8 +522,25 @@ fetch("data/dashboard.json")
         say(`Готово за ${fmt((performance.now() - t0) / 1000, 1)} с: ${label}.`);
       }
     };
+    if (SHOT) { inline(text, nextDate, handle); return; }
+    worker = new Worker("worker.js");
+    worker.onmessage = (e) => handle(e.data);
     worker.onerror = (e) => { say(`Ошибка расчёта: ${e.message}`, true); demoBtn.disabled = false; };
-    worker.postMessage({ text, nextDate: $("next-date").value || "2026-12-10" });
+    worker.postMessage({ text, nextDate });
+  }
+
+  // Для скриншотов (?shot=…): считаем в основном потоке — headless Chrome не ждёт фоновый поток.
+  const SHOT = new URLSearchParams(location.search).has("shot");
+  function inline(text, nextDate, handle) {
+    const go = () => {
+      const { records, report } = window.PulseModel.readExport(text);
+      handle({ type: "report", report });
+      const result = report.missing.length || !records.length ? null : window.PulseModel.analyze(records, nextDate);
+      handle({ type: "done", result });
+    };
+    if (window.PulseModel) { go(); return; }
+    const sc = document.createElement("script");
+    sc.src = "model.js"; sc.onload = go; document.head.append(sc);
   }
 
   const readFile = (f) => {
@@ -536,6 +558,8 @@ fetch("data/dashboard.json")
       .then((t) => run(t, "демо-выгрузка (синтетические данные)"))
       .catch((e) => say(`Демо-выгрузка не найдена (${e.message}). Запустите scripts/build.py.`, true));
   });
+  window.pulseDemo = () => demoBtn.click();
+  if (new URLSearchParams(location.search).get("demo") === "1") demoBtn.click();
 })();
 
 // ---------- План для координатора города ----------
@@ -626,6 +650,15 @@ fetch("data/dashboard.json")
   input.addEventListener("input", () => { if (cities.has(input.value.trim())) show(input.value.trim()); });
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") show(input.value.trim()); });
   daySel.addEventListener("change", () => show(input.value.trim()));
+  window.pulseCity = (name, withMessage) => {
+    const c = resolve(name); if (!c) return;
+    show(c);
+    if (withMessage) {  // в обзоре — только показать текст, буфер обмена без клика не трогаем
+      $("city-msg").value = message(current);
+      $("city-msg-box").querySelector(".sub").textContent = "Готовый текст для чата волонтёров — кнопка выше копирует его, перед отправкой можно поправить:";
+      $("city-msg-box").hidden = false;
+    }
+  };
   $("city-msg-btn").addEventListener("click", async () => {
     if (!current) return;
     const box = $("city-msg-box"), ta = $("city-msg");

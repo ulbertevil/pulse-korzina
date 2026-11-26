@@ -31,7 +31,7 @@ jobs:
       - name: Версия файлов в ссылках, чтобы браузер не взял старый скрипт
         run: |
           V="${GITHUB_SHA::7}"
-          sed -i "s|href=\"style.css\"|href=\"style.css?v=$V\"|; s|src=\"app.js\"|src=\"app.js?v=$V\"|" site/index.html
+          sed -i "s|href=\"style.css\"|href=\"style.css?v=$V\"|; s|src=\"app.js\"|src=\"app.js?v=$V\"|; s|src=\"tour.js\"|src=\"tour.js?v=$V\"|" site/index.html
           sed -i "s|new Worker(\"worker.js\")|new Worker(\"worker.js?v=$V\")|" site/app.js
           sed -i "s|importScripts(\"model.js\")|importScripts(\"model.js?v=$V\")|" site/worker.js
           grep -c "?v=$V" site/index.html site/app.js site/worker.js
