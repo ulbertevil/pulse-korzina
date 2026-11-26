@@ -166,3 +166,10 @@ td .muted { color: var(--muted); }
 .check ul { margin: 6px 0 0; padding-left: 18px; }
 .up-tiles { margin: 8px 0 18px; }
 .up-h { margin: 6px 0 8px; }
+
+.chart .ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .stem { stroke: var(--s1); stroke-width: 2; }
+.chart .dot { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
+.chart .dot.anchor { fill: var(--muted); }
+.chart .stem.anchor { stroke: var(--muted); }
+.prereg { border-left: 3px solid var(--accent); }

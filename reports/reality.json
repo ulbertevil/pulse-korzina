@@ -1,0 +1,154 @@
+{
+  "public": [
+    {
+      "fact": "kd_spring_total_kg",
+      "label": "Вся сеть, весенняя акция",
+      "unit": "кг на магазин",
+      "real": 72.6485,
+      "synthetic": 72.6479,
+      "ratio": 1.0,
+      "stores": 1055,
+      "in_sample": true,
+      "caveat": "По этой цифре синтетика откалибрована — совпадение по построению, не проверка.",
+      "source_url": "https://выручаем.рф/news/korzina-dobroty-mart",
+      "status": "fund_statement"
+    },
+    {
+      "fact": "marathon_2024_kg_pyat",
+      "label": "Москва и Петербург, марафон 2024",
+      "unit": "кг на магазин",
+      "real": 33.5612,
+      "synthetic": 65.4186,
+      "ratio": 1.9492,
+      "stores": 129,
+      "in_sample": false,
+      "caveat": "Декабрь 2024 вне истории синтетики; сравниваем с ноябрём 2025, на магазин.",
+      "source_url": "https://moskvichmag.ru/gorod/v-pyaterochke-podveli-itogi-blagotvoritelnogo-marafona-korzina-dobroty",
+      "status": "secondary"
+    },
+    {
+      "fact": "city_h1_2025_msk",
+      "label": "Москва, I полугодие 2025",
+      "unit": "кг",
+      "real": 16098.0,
+      "synthetic": 9648.83,
+      "ratio": 0.5994,
+      "stores": 101,
+      "in_sample": false,
+      "caveat": "В полугодие могли входить и другие сборы фонда, не только две акции.",
+      "source_url": "https://www.yuga.ru/articles/society/10292.html",
+      "status": "secondary"
+    },
+    {
+      "fact": "city_h1_2025_spb",
+      "label": "Петербург, I полугодие 2025",
+      "unit": "кг",
+      "real": 20654.0,
+      "synthetic": 4203.38,
+      "ratio": 0.2035,
+      "stores": 46,
+      "in_sample": false,
+      "caveat": "В полугодие могли входить и другие сборы фонда, не только две акции.",
+      "source_url": "https://www.yuga.ru/articles/society/10292.html",
+      "status": "secondary"
+    },
+    {
+      "fact": "partner_tver_2026_02",
+      "label": "Тверь, 7 магазинов, февраль 2026",
+      "unit": "кг на магазин",
+      "real": 222.0,
+      "synthetic": 72.6336,
+      "ratio": 0.3272,
+      "stores": 11,
+      "in_sample": false,
+      "caveat": "Акция партнёра в феврале; сравниваем с мартом 2026, на магазин.",
+      "source_url": "https://tvereparhia.ru/news/bolee-polutora-tonn-produktov-sobrala-pervaja-v-jetom-godu-blagotvoritelnaja-akcija-korzina-dobroty/",
+      "status": "secondary"
+    },
+    {
+      "fact": "partner_ulyanovsk_2026_11",
+      "label": "Ульяновск, ноябрь 2026",
+      "unit": "кг",
+      "real": 502.0,
+      "synthetic": 3451.98,
+      "ratio": 6.8765,
+      "stores": 21,
+      "in_sample": false,
+      "caveat": "Цифра одного партнёра; сколько магазинов он покрывал, неизвестно.",
+      "source_url": "https://mitropolia-simbirsk.ru/2026/11/22/502-kg-produktov-dlya-nuzhdayushhihsya-sobrano-v-hode-akczii-korzina-dobroty-v-noyabre",
+      "status": "secondary"
+    }
+  ],
+  "spread": 3.601,
+  "volunteers": [
+    {
+      "scale": 0.0,
+      "kg_opt": 97522.40829,
+      "kg_current": 97522.40829,
+      "kg_uniform": 97522.40829,
+      "kg_oracle": 97522.40829,
+      "uplift_vs_current": 0.0,
+      "uplift_vs_uniform": 0.0,
+      "regret": 0.0
+    },
+    {
+      "scale": 0.5,
+      "kg_opt": 120515.00141,
+      "kg_current": 115206.05299,
+      "kg_uniform": 119094.51686,
+      "kg_oracle": 120533.82,
+      "uplift_vs_current": 0.04608,
+      "uplift_vs_uniform": 0.01193,
+      "regret": 0.00016
+    },
+    {
+      "scale": 1.0,
+      "kg_opt": 149760.38385,
+      "kg_current": 138063.7562,
+      "kg_uniform": 145889.10681,
+      "kg_oracle": 149760.38385,
+      "uplift_vs_current": 0.08472,
+      "uplift_vs_uniform": 0.02654,
+      "regret": 0.0
+    },
+    {
+      "scale": 2.0,
+      "kg_opt": 234526.07658,
+      "kg_current": 205809.63979,
+      "kg_uniform": 220685.54243,
+      "kg_oracle": 235153.44748,
+      "uplift_vs_current": 0.13953,
+      "uplift_vs_uniform": 0.06272,
+      "regret": 0.00267
+    }
+  ],
+  "stress": [
+    {
+      "sigma_store": 0.5,
+      "sigma_region": 0.3,
+      "wape_glm": 0.294,
+      "wape_naive": 0.3921,
+      "net_err_glm": 0.0746,
+      "net_err_naive": 0.1971,
+      "gain_vs_naive": 0.2501
+    },
+    {
+      "sigma_store": 0.8,
+      "sigma_region": 0.8,
+      "wape_glm": 0.3115,
+      "wape_naive": 0.405,
+      "net_err_glm": 0.0816,
+      "net_err_naive": 0.2049,
+      "gain_vs_naive": 0.2308
+    },
+    {
+      "sigma_store": 1.0,
+      "sigma_region": 1.3,
+      "wape_glm": 0.3229,
+      "wape_naive": 0.4141,
+      "net_err_glm": 0.0921,
+      "net_err_naive": 0.2141,
+      "gain_vs_naive": 0.2202
+    }
+  ]
+}

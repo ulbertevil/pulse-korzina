@@ -199,6 +199,89 @@ const need = (sd, mean, eff, share, alpha, power) => {
 };
 
 // ---------- сборка страницы ----------
+// ---------- проверка на реальности ----------
+const times = (r) => (r >= 1 ? `в ${fmt(r, r < 10 ? 1 : 0)} раза больше` : `в ${fmt(1 / r, 1 / r < 10 ? 1 : 0)} раза меньше`);
+function ratioChart(container, rows) {
+  const draw = () => {
+    const W = Math.max(280, container.clientWidth), narrow = W < 560;
+    const labelW = narrow ? 0 : Math.min(260, W * 0.4), rowH = narrow ? 52 : 34;
+    const m = { t: 8, r: 16, l: labelW + 8, b: 40 }, iw = W - m.l - m.r, H = m.t + rows.length * rowH + m.b;
+    const lo = Math.log(0.1), hi = Math.log(10), X = (v) => m.l + ((Math.log(v) - lo) / (hi - lo)) * iw;
+    const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": container.dataset.label });
+    [0.2, 0.5, 1, 2, 5].forEach((v) => {
+      svg.append(s("line", { x1: X(v), x2: X(v), y1: m.t, y2: H - m.b, class: v === 1 ? "ref" : "grid" }));
+      const tx = s("text", { x: X(v), y: H - m.b + 16, "text-anchor": "middle", class: "tick" });
+      tx.textContent = v === 1 ? "совпадает" : `×${fmt(v, v < 1 ? 1 : 0)}`; svg.append(tx);
+    });
+    const cap = s("text", { x: m.l + iw / 2, y: H - 6, "text-anchor": "middle", class: "tick" });
+    cap.textContent = "← синтетика меньше реальности · больше →"; svg.append(cap);
+    rows.forEach((r, i) => {
+      const yc = m.t + i * rowH + (narrow ? 34 : rowH / 2), cls = r.in_sample ? " anchor" : "";
+      const lab = s("text", { x: narrow ? m.l : 0, y: narrow ? yc - 14 : yc + 4, class: "val" });
+      lab.textContent = r.label; svg.append(lab);
+      svg.append(s("line", { x1: X(1), x2: X(r.ratio), y1: yc, y2: yc, class: "stem" + cls }));
+      const dot = s("circle", { cx: X(r.ratio), cy: yc, r: 6, class: "dot" + cls, tabindex: 0 });
+      const show = (e) => showTip(e, r.label, [
+        { color: "transparent", value: `${fmt(r.real)} ${r.unit}`, name: "публичная цифра" },
+        { color: "transparent", value: `${fmt(r.synthetic)} ${r.unit}`, name: "синтетика" },
+        { color: "transparent", value: times(r.ratio), name: "" }]);
+      dot.addEventListener("pointermove", show); dot.addEventListener("pointerleave", hideTip);
+      dot.addEventListener("focus", () => { const b = dot.getBoundingClientRect(); show({ clientX: b.right, clientY: b.top }); });
+      dot.addEventListener("blur", hideTip);
+      svg.append(dot);
+    });
+    container.replaceChildren(svg);
+  };
+  draw();
+  new ResizeObserver(() => draw()).observe(container);
+}
+
+function renderReality(R, F) {
+  if (!R) return;
+  const out = R.public.filter((r) => !r.in_sample);
+  $("real-sub").textContent = `${out.length} проверок вне калибровки + 1 цифра, по которой синтетика откалибрована (серая).`;
+  ratioChart($("real-chart"), R.public);
+  $("real-note").textContent = `По сети синтетика совпадает с цифрой фонда по построению. По городам она промахивается в среднем в ${fmt(R.spread, 1)} раза `
+    + "в обе стороны: реальные города различаются гораздо сильнее, чем заложено в синтетику. Поэтому цифрам по отдельным городам и магазинам "
+    + "на этой странице верить нельзя — их даст только выгрузка фонда. Часть расхождения — разный охват: партнёр мог считать не все магазины города.";
+  const uly = R.public.find((r) => r.fact === "partner_ulyanovsk_2026_11");
+  if (uly && uly.ratio > 2) $("real-note").textContent += ` Пример: в Ульяновске синтетика ${times(uly.ratio)} публичной цифры, `
+    + "а в топе «где первый волонтёр даёт больше всего» много ульяновских магазинов. Такие адресные рекомендации надо пересчитать на выгрузке фонда.";
+  table($("real-table"), [
+    { title: "Что сравниваем", render: (r) => el("span", {}, r.label, el("br"), el("span", { class: "muted", text: r.caveat })) },
+    { title: "Публично", num: true, render: (r) => `${fmt(r.real)} ${r.unit}` },
+    { title: "Синтетика", num: true, render: (r) => `${fmt(r.synthetic)} ${r.unit}` },
+    { title: "Разница", num: true, render: (r) => (r.in_sample ? "калибровка" : times(r.ratio)) },
+    { title: "Источник", render: (r) => { const a = el("a", { href: r.source_url, rel: "noopener", target: "_blank" });
+      a.textContent = (r.source_url.match(/^https?:\/\/([^/]+)/) || [, r.source_url])[1].replace(/^www\./, ""); return a; } },
+  ], R.public);
+
+  const SC = { 0: "нет эффекта", 0.5: "вдвое меньше", 1: "как оценила модель", 2: "вдвое больше" };
+  table($("robust-table"), [
+    { title: "Эффект волонтёра в жизни", render: (r) => SC[r.scale] ?? `×${r.scale}` },
+    { title: "К «как в ноябре»", num: true, render: (r) => signedPct(r.uplift_vs_current) },
+    { title: "К «поровну»", num: true, render: (r) => signedPct(r.uplift_vs_uniform) },
+    { title: "Недобор к идеалу", num: true, render: (r) => pct(r.regret, 1) },
+  ], R.volunteers);
+  const worst = Math.max(...R.volunteers.map((r) => r.regret));
+  $("robust-note").textContent = "Рекомендация не делает хуже ни в одном сценарии: при нулевом эффекте она равна ноябрьской, "
+    + `при любом другом — лучше. «Недобор к идеалу» — сколько теряем против расстановки, которая знала бы настоящий эффект: не больше ${pct(worst, 1)}. `
+    + "Если эффект намного больше оценки (×4 и выше), людей выгоднее концентрировать сильнее — это проверит A/B-эксперимент.";
+
+  table($("stress-table"), [
+    { title: "Разброс магазинов / регионов", render: (r) => `×${fmt(Math.exp(r.sigma_store), 1)} / ×${fmt(Math.exp(r.sigma_region), 1)}` },
+    { title: "Ошибка модели", num: true, render: (r) => pct(r.wape_glm) },
+    { title: "«Как в прошлый раз»", num: true, render: (r) => pct(r.wape_naive) },
+    { title: "Ошибка ниже на", num: true, render: (r) => pct(r.gain_vs_naive, 0) },
+  ], R.stress);
+  const last = R.stress[R.stress.length - 1];
+  $("stress-note").textContent = `Разброс — типичное отличие магазина или региона от среднего. Даже при регионах, различающихся в ${fmt(Math.exp(last.sigma_region), 1)} раза `
+    + `(примерно как в публичных цифрах), модель ошибается на ${pct(last.gain_vs_naive, 0)} меньше, чем «как в прошлый раз».`;
+
+  if (F) $("prereg-text").textContent = `Сбор по сети ${tons(F.pred)}: с вероятностью 80% от ${tons(F.lo80)} до ${tons(F.hi80)}, 95% — от ${tons(F.lo95)} до ${tons(F.hi95)}. `
+    + `Это ${fmt(F.pred / F.stores)} кг на магазин при ${fmt(F.stores)} магазинах. Проверяем сумму по сети: разбивка по городам ненадёжна (см. выше).`;
+}
+
 function render(D) {
   const k = D.kpi, M = D.meta;
   $("src-table").href = M.source_table;
@@ -312,6 +395,7 @@ function render(D) {
       a.textContent = (r.source_url.match(/^https?:\/\/([^/]+)/) || [, r.source_url])[1].replace(/^www\./, ""); return a; } },
   ], D.facts);
   $("dl-facts").href = "data/facts.csv";
+  renderReality(D.reality, { pred: D.kpi.pred_kg, lo80: D.kpi.lo80, hi80: D.kpi.hi80, lo95: D.kpi.lo95, hi95: D.kpi.hi95, stores: D.meta.stores });
   $("app").setAttribute("aria-busy", "false");
 }
 

@@ -13,7 +13,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from pulse import allocate, backtest, experiment, features, forecast, site_export, synth, upload  # noqa: E402
+from pulse import allocate, backtest, experiment, features, forecast, reality, site_export, synth, upload  # noqa: E402
 from pulse.models import GLMEB  # noqa: E402
 from pulse.stores import load_table  # noqa: E402
 
@@ -100,6 +100,15 @@ def main() -> None:
     hourly_plan = allocate.hourly_split(plan, pred_cur, hw, b)
     site = site_export.build(rep, stores, hourly_plan, total, alloc, alloc_sum, allocate.city_summary(alloc),
                              res, summ, preds, des, ROOT / "data/facts.csv")
+    # Проверка на реальности
+    cmp = reality.compare_public(agg, reality.load_facts(ROOT / "data/facts.csv"))
+    robust = reality.volunteer_robustness(slots_dec, budget, current, b)
+    stress = reality.stress_heterogeneity(stores, slots)
+    real = {"public": cmp.round(4).to_dict(orient="records"), "spread": round(reality.ratio_spread(cmp), 3),
+            "volunteers": robust.round(5).to_dict(orient="records"),
+            "stress": stress.round(4).to_dict(orient="records")}
+    (rep / "reality.json").write_text(json.dumps(real, ensure_ascii=False, indent=2), encoding="utf-8")
+    site["reality"] = real
     site_export.write(ROOT / "site/data", site, {
         "experiment_2026-12_assignment.csv": rep / "experiment_2026-12_assignment.csv",
         "allocation_2026-12_slots.csv": rep / "allocation_2026-12_slots.csv",
@@ -109,6 +118,9 @@ def main() -> None:
     })
     # Демо-выгрузка для кнопки «Попробовать» на сайте: та же синтетика в формате выгрузки фонда
     upload.demo_export(hourly, stores).to_csv(ROOT / "site/data/demo_export.csv", index=False)
+    print(f"реальность: синтетика по городам промахивается в {real['spread']:.1f} раза; при нулевом эффекте "
+          f"волонтёров расстановка не хуже ноябрьской: {robust.loc[robust.scale == 0, 'uplift_vs_current'].iloc[0]:+.1%}; "
+          f"при разбросе регионов ×3,7 модель лучше наивной на {stress['gain_vs_naive'].iloc[-1]:.0%}")
     print(f"A/B: MDE {des['mde']['raw']:.1%} → {des['mde']['cuped_strata']:.1%} с CUPED и стратами; "
           f"A/A ложных срабатываний {des['check_aa']['reject_rate']:.0%}, "
           f"мощность на MDE {des['check_power_at_mde']['reject_rate']:.0%}")
