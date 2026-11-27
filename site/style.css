@@ -151,6 +151,8 @@ td .muted { color: var(--muted); }
 .ab-form output { color: var(--ink); font-weight: 600; }
 .ab-form input[type="range"] { width: 100%; accent-color: var(--accent); }
 .ab-form select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
+.ab-src { margin: 0 0 12px; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 8px; font-size: 14px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.btn-sm { padding: 4px 10px; font-size: 14px; border-radius: 8px; }
 .ab-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .ab-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 480px) { .ab-compare { grid-template-columns: 1fr; } }

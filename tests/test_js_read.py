@@ -55,3 +55,31 @@ def test_bad_numbers_and_empty_store_are_skipped():
     r = read("магазин,дата,кг\n,2026-12-10,30\nA2,2026-12-10,нет\nA3,2026-12-10,-5\nA4,2026-12-10,7\n")
     assert r["report"]["used"] == 1
     assert r["report"]["reasons"] == {"нет магазина": 1, "кг не число": 2}
+
+
+AB_JS = """
+const M = require(process.argv[1]);
+let s = ""; process.stdin.on("data", (c) => (s += c)).on("end", () => console.log(JSON.stringify(M.abStats(JSON.parse(s)))));
+"""
+
+
+def ab_stats(rows: list[dict]) -> dict | None:
+    out = subprocess.run(["node", "-e", AB_JS, str(ROOT / "site/model.js")], input=json.dumps(rows), capture_output=True,
+                         text=True, timeout=60, check=True)
+    return json.loads(out.stdout)
+
+
+def test_ab_on_uploaded_file_matches_python_design():
+    """Калькулятор A/B на выгрузке считает разброс так же, как pulse/experiment.py."""
+    import numpy as np
+    import pandas as pd
+    from pulse import experiment as ex
+    rng = np.random.default_rng(3)
+    pred = rng.lognormal(4, 0.6, 1200)
+    df = pd.DataFrame({"pred": pred, "kg": pred * rng.lognormal(0, 0.35, 1200)})
+    py = ex.residual_sd(df, stratum=ex.strata(df, by=()))
+    js = ab_stats(df.to_dict("records"))
+    for k in ("mean", "sd_raw", "sd_cuped", "sd_cuped_strata", "rho", "theta"):
+        assert js[k] == pytest.approx(py[k], rel=1e-9), k
+    assert js["stores"] == 1200 and js["sd_cuped_strata"] < js["sd_raw"]
+    assert ab_stats(df.head(30).to_dict("records")) is None  # мало магазинов — остаёмся на синтетике

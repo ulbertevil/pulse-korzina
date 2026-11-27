@@ -112,6 +112,7 @@
             <a href="#" class="download" id="up-dl-plan">Скачать план-факт по всем магазинам (CSV)</a> ·
             <a href="#" class="download" id="up-dl-fc">Скачать прогноз следующей акции (CSV)</a>
           </p>
+          <p class="sub" id="up-ab"></p>
         </div>
       </div>
     </section>
@@ -257,8 +258,9 @@
     </section>
 
     <section id="ab" class="section">
-      <h2>Калькулятор A/B-эксперимента <span class="badge">синтетика</span></h2>
+      <h2>Калькулятор A/B-эксперимента <span class="badge" id="ab-badge">синтетика</span></h2>
       <p class="section-lede">Как узнать, работает ли новая идея — например, «+1 волонтёр» или «новая табличка у короба». Часть магазинов делает по-новому (тест), часть — как раньше (контроль), и сравниваем. Калькулятор отвечает, хватит ли магазинов, чтобы отличить настоящий эффект от случайности. Магазины делятся на группы похожих, а прогноз модели убирает предсказуемую часть разброса — поэтому магазинов нужно примерно втрое меньше, чем при простом делении.</p>
+      <div class="ab-src" id="ab-src" hidden><span id="ab-src-text"></span> <button type="button" class="btn btn-2 btn-sm" id="ab-reset">Вернуть синтетику</button></div>
       <div class="card ab">
         <form class="ab-form" id="ab-form">
           <label>Магазинов в эксперименте <output id="ab-n-out"></output>
@@ -298,7 +300,7 @@
         <li><strong>После акции.</strong> Загрузить новую выгрузку: план-факт покажет магазины ниже ожидаемого — с ними стоит разобраться (не было волонтёров? неудачное место короба?). Прогноз следующей акции обновится сам.</li>
         <li><strong>На следующей акции — эксперимент.</strong> Выбрать одну идею (например, «+1 волонтёр»), взять список «тест / контроль» из <a href="#ab">калькулятора</a> и после акции измерить эффект. Это заменит допущения модели о волонтёрах настоящим числом.</li>
       </ol>
-      <p class="note">Код открыт: <a href="https://github.com/ulbertevil/pulse-korzina" rel="noopener" target="_blank">github.com/ulbertevil/pulse-korzina</a>, 107 автотестов (включая проверку сайта в браузере), подробный план внедрения — в <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/implementation.md" rel="noopener" target="_blank">docs/implementation.md</a>. Страницу можно разместить на любом хостинге фонда.</p>
+      <p class="note">Код открыт: <a href="https://github.com/ulbertevil/pulse-korzina" rel="noopener" target="_blank">github.com/ulbertevil/pulse-korzina</a>, 109 автотестов (включая проверку сайта в браузере), подробный план внедрения — в <a href="https://github.com/ulbertevil/pulse-korzina/blob/main/docs/implementation.md" rel="noopener" target="_blank">docs/implementation.md</a>. Страницу можно разместить на любом хостинге фонда.</p>
     </section>
 
     <section id="method" class="section">

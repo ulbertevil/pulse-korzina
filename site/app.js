@@ -309,6 +309,7 @@ function renderReality(R, F) {
     + `Числа берутся из файла ${F.stores_csv.replace(/_stores\.csv$/, ".json")}, а не из пересборки; SHA-256 прогноза по магазинам начинается с ${F.stores_csv_sha256.slice(0, 16)}, тег в git — ${F.git_tag}.`;
 }
 
+let abUse = null; // ставит калькулятору A/B данные загруженного файла
 function render(D) {
   const k = D.kpi, M = D.meta;
   $("src-table").href = M.source_table;
@@ -405,9 +406,10 @@ function render(D) {
     { title: "Ошибка суммы", num: true, render: (r) => pct(r.network_ape) },
     { title: "К наивной", num: true, render: (r) => (r.id === "naive" ? "—" : signedPct(r.vs_naive)) }], D.models);
 
-  // A/B
-  const E = D.experiment;
-  const nIn = $("ab-n"); nIn.max = E.stores; nIn.value = E.stores;
+  // A/B: по умолчанию — синтетика, после загрузки выгрузки — её последняя акция
+  const SYN = D.experiment;
+  let E = SYN, own = null;
+  const nIn = $("ab-n");
   const upd = () => {
     const n = +nIn.value, share = +$("ab-share").value, eff = +$("ab-eff").value;
     const alpha = +$("ab-alpha").value, power = +$("ab-power").value;
@@ -420,16 +422,34 @@ function render(D) {
     $("ab-verdict").textContent = nC <= n
       ? `Хватает: эффект ${pct(eff, 0)} будет заметен на ${fmt(n)} магазинах (${fmt(nt)} в тесте, ${fmt(nc)} в контроле).`
       : `Не хватает: для эффекта ${pct(eff, 0)} нужно ${fmt(nC)} магазинов, а в эксперименте ${fmt(n)}. Увеличьте выборку или ищите эффект крупнее.`;
-    const extra = Math.round(nt * (E.days_per_store || 2) / 10) * 10;
+    const extra = Math.round(nt * (E.days_per_store || SYN.days_per_store || 2) / 10) * 10;
     $("ab-cost").textContent = `Если проверяется «+1 волонтёр»: это ≈ ${fmt(extra)} новых смен на ${fmt(nt)} тестовых магазинах. `
       + "Люди должны быть новыми, а не снятыми с контрольных магазинов, — иначе тест сравнивает перестановку, а не добавку.";
   };
+  const note = () => {
+    const sim = `Проверено 200 раз на последней синтетической акции: когда эффекта нет, эксперимент ошибочно «находит» его в ${pct(SYN.aa, 0)} случаев (допустимо 5%); `
+      + `когда эффект равен минимальному заметному, находит его в ${pct(SYN.power_at_mde, 0)} случаев (цель 80%). `;
+    const data = own
+      ? `Разброс сборов и то, насколько прогноз его объясняет, взяты из вашего файла: акция ${dateLabel(own.action)}, ${fmt(own.stores)} магазинов, `
+        + `связь факта с прогнозом ρ = ${fmt(own.rho, 2)} (в синтетике ${fmt(SYN.rho, 2)}). Прогноз для неё сделан только по прошлым акциям — как будет и в настоящем эксперименте. `
+      : "Разброс сборов и то, насколько прогноз его объясняет, взяты из синтетики: на настоящей выгрузке нужное число магазинов будет другим — загрузите её в разделе «Свои данные», и калькулятор пересчитается. ";
+    $("ab-check").textContent = sim + data
+      + `Эффект перестановки волонтёров по модели — от ${signedPct(D.kpi.uplift_vs_uniform)} до ${signedPct(D.kpi.uplift_vs_current)}, это на границе того, что видно за одну акцию: надёжнее проверять на двух акциях подряд.`;
+  };
+  const use = (stats) => {
+    own = stats; E = stats || SYN;
+    nIn.min = Math.min(100, Math.max(20, Math.floor(E.stores / 2)));
+    nIn.step = own ? 1 : 20;
+    nIn.max = E.stores; nIn.value = E.stores;
+    $("ab-badge").textContent = own ? "ваш файл" : "синтетика";
+    $("ab-src").hidden = !own;
+    if (own) $("ab-src-text").textContent = `Калькулятор пересчитан на загруженном файле (акция ${dateLabel(own.action)}, ${fmt(own.stores)} магазинов).`;
+    upd(); note();
+  };
   ["ab-n", "ab-share", "ab-eff", "ab-alpha", "ab-power"].forEach((id) => $(id).addEventListener("input", upd));
-  upd();
-  $("ab-check").textContent = `Проверено 200 раз на последней синтетической акции: когда эффекта нет, эксперимент ошибочно «находит» его в ${pct(E.aa, 0)} случаев (допустимо 5%); `
-    + `когда эффект равен минимальному заметному, находит его в ${pct(E.power_at_mde, 0)} случаев (цель 80%). `
-    + "Разброс сборов и то, насколько прогноз его объясняет, взяты из синтетики: на настоящей выгрузке нужное число магазинов будет другим. "
-    + `Эффект перестановки волонтёров по модели — от ${signedPct(D.kpi.uplift_vs_uniform)} до ${signedPct(D.kpi.uplift_vs_current)}, это на границе того, что видно за одну акцию: надёжнее проверять на двух акциях подряд.`;
+  $("ab-reset").addEventListener("click", () => use(null));
+  abUse = use;
+  use(null);
   $("dl-assign").href = "data/experiment_assignment.csv";
 
   // факты
@@ -525,6 +545,12 @@ fetch("data/dashboard.json")
       ["нижняя_80", (r) => r1(r.lo80)], ["верхняя_80", (r) => r1(r.hi80)]], F.perStore);
     a2.download = `прогноз_${F.date}.csv`;
     $("up-result").hidden = false;
+    const note = $("up-ab");
+    if (R.ab && abUse) {
+      abUse({ ...R.ab, action: R.lastAction });
+      note.replaceChildren("Калькулятор ", el("a", { href: "#ab", text: "A/B-эксперимента" }),
+        ` пересчитан на этом файле: разброс сборов ${fmt(R.ab.stores)} магазинов акции ${dateLabel(R.lastAction)}.`);
+    } else note.textContent = "Калькулятор A/B остался на синтетике: для пересчёта нужно хотя бы 40 магазинов в последней акции.";
   }
 
   function run(text, label) {

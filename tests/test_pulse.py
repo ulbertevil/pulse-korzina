@@ -1,4 +1,5 @@
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -158,3 +159,13 @@ def test_every_store_gets_a_locality_not_a_region():
     assert not stores["locality"].str.contains(r"(?:край|обл\.?|респ\.?)$", regex=True).any()
     norm = lambda s: s.str.lower().str.replace(".", "", regex=False).str.strip()  # noqa: E731
     assert (norm(stores["city"]) != norm(stores["locality"])).sum() == 146  # столько строк с регионом в «Городе»
+
+
+def test_methodology_coefficient_table_matches_model():
+    """Таблица коэффициентов в методике совпадает с моделью, по которой сделан прогноз."""
+    import re
+    coef = json.loads((ROOT / "reports/forecast_2026-12.json").read_text(encoding="utf-8"))["coef"]
+    rows = re.findall(r"^\| [^|]*\(`(\w+)`\) \| ([^|]+) \|", (ROOT / "docs/methodology.md").read_text(encoding="utf-8"), re.M)
+    assert {k for k, _ in rows} == set(coef)
+    for k, v in rows:
+        assert float(v.strip().replace("−", "-").replace(",", ".")) == pytest.approx(coef[k], abs=6e-4), k

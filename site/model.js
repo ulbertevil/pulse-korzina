@@ -348,6 +348,27 @@
       season: SEASON_OF_MONTH[new Date(t).getUTCMonth() + 1], t_years: (t - start) / DAY / 365.25 }));
   }
 
+  /** Разброс сборов для калькулятора A/B — как pulse/experiment.py: residual_sd по план-факту последней акции.
+   *  Ковариата — прогноз, сделанный до акции; страты — десятые доли прогноза. */
+  function abStats(rows, nBins = 10) {
+    const n = rows.length;
+    if (n < 4 * nBins) return null;
+    const y = rows.map((r) => r.kg), x = rows.map((r) => r.pred);
+    const my = sum(y) / n, mx = sum(x) / n;
+    const cov = sum(y.map((v, i) => (v - my) * (x[i] - mx))) / (n - 1);
+    const vx = sum(x.map((v) => (v - mx) ** 2)) / (n - 1), vy = sum(y.map((v) => (v - my) ** 2)) / (n - 1);
+    if (!(vx > 0 && vy > 0)) return null;
+    const theta = cov / vx, cu = y.map((v, i) => v - theta * (x[i] - mx));
+    const mc = sum(cu) / n, sdC = Math.sqrt(sum(cu.map((v) => (v - mc) ** 2)) / (n - 1));
+    const order = x.map((v, i) => i).sort((a, b) => x[a] - x[b] || a - b), bin = new Array(n);
+    order.forEach((i, r) => { bin[i] = Math.floor(r * nBins / n); });
+    const bs = new Array(nBins).fill(0), bc = new Array(nBins).fill(0);
+    cu.forEach((v, i) => { bs[bin[i]] += v; bc[bin[i]] += 1; });
+    const ss = sum(cu.map((v, i) => (v - bs[bin[i]] / bc[bin[i]]) ** 2));
+    return { stores: n, mean: my, sd_raw: Math.sqrt(vy), sd_cuped: sdC, sd_cuped_strata: Math.sqrt(ss / (n - nBins)),
+      rho: cov / Math.sqrt(vx * vy), theta };
+  }
+
   /** Полный расчёт: план-факт последней акции, бэктест, прогноз следующей. */
   function analyze(records, nextDateIso, onProgress) {
     const agg = aggregate(records);
@@ -360,6 +381,7 @@
     out.planFact = cur.map((r, i) => ({ store: r.store_id, city: r.city, region: r.region, kg: r.kg, pred: pCur[i],
       lo80: pCur[i] * q[0.1], hi80: pCur[i] * q[0.9] })).sort((a, b) => (a.kg - a.pred) - (b.kg - b.pred));
     out.lastAction = last;
+    out.ab = abStats(out.planFact);
     out.steps = acts.length > 3 ? backtest(agg, 3, onProgress) : [];
     const sd = netLogSd(out.steps.map((s) => s));
     const plan = nextPlan(agg, nextDateIso);
@@ -374,6 +396,6 @@
   }
 
   const api = { parseCSV, mapColumns, readExport, aggregate, fitPoisson, glmFit, glmPredict, naive, backtest,
-    ratioQuantiles, nextPlan, analyze, NAMES };
+    ratioQuantiles, nextPlan, abStats, analyze, NAMES };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.PulseModel = api;
 })(typeof self !== "undefined" ? self : this);
