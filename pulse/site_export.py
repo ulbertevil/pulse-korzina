@@ -83,7 +83,8 @@ def build(rep: Path, stores: pd.DataFrame, hourly_plan: pd.DataFrame, total: dic
 
     exp = {k: des[k] for k in ("stores", "mean", "sd_raw", "sd_cuped", "sd_cuped_strata", "rho", "alpha", "power")}
     exp.update({"mde": des["mde"], "stores_needed": des["stores_needed"], "aa": des["check_aa"]["reject_rate"],
-                "power_at_mde": des["check_power_at_mde"]["reject_rate"], "calibrated_on": des["calibrated_on"]})
+                "power_at_mde": des["check_power_at_mde"]["reject_rate"], "calibrated_on": des["calibrated_on"],
+                "days_per_store": _r(len(hourly_plan[["store_id", "date"]].drop_duplicates()) / max(total["stores"], 1), 2)})
 
     return {
         "meta": {"generated": date.today().isoformat(), "synthetic": True, "action": total["action_id"],

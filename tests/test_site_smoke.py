@@ -1,13 +1,16 @@
 """Сайт в настоящем браузере: страница открывается без ошибок, главные разделы заполняются.
 
-Нужны Chrome/Chromium и собранные данные (python scripts/build.py); иначе тест пропускается.
+Нужны Chrome/Chromium и собранные данные (python scripts/build.py); иначе тест пропускается, а в CI — падает.
 Страница открывается в headless Chrome, после расчётов берётся готовый DOM (--dump-dom).
+Город и цель берутся из собранных данных, поэтому тест работает и после подключения новой таблицы.
 """
 from __future__ import annotations
 
 import functools
 import html
 import http.server
+import json
+import os
 import re
 import shutil
 import subprocess
@@ -22,8 +25,19 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
 CHROME = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which("chromium-browser")
 
-pytestmark = pytest.mark.skipif(not CHROME or not (SITE / "data/dashboard.json").exists(),
-                                reason="нужны Chrome и собранные данные (scripts/build.py)")
+READY = bool(CHROME) and (SITE / "data/coordinator.json").exists()
+if os.environ.get("CI") and not READY:
+    raise RuntimeError("в CI нужны Chrome и собранные данные: сначала python scripts/build.py")
+pytestmark = pytest.mark.skipif(not READY, reason="нужны Chrome и собранные данные (scripts/build.py)")
+
+
+def biggest_city_and_goal() -> tuple[str, float]:
+    """Город с наибольшим числом точек и цель на 3% выше сбора при рекомендуемой расстановке."""
+    c = json.loads((SITE / "data/coordinator.json").read_text(encoding="utf-8"))
+    i = c["fields"].index("city") if "city" in c["fields"] else 0
+    cities = [r[i] for r in c["rows"]]
+    city = max(set(cities), key=lambda x: (cities.count(x), x))
+    return re.sub(r"\s+г\.?$", "", city), round(c["goal"]["kg_opt"] * 1.03 / 1000, 1)
 
 
 @pytest.fixture(scope="module")
@@ -59,14 +73,15 @@ def no_errors(page: str) -> None:
 
 @pytest.mark.parametrize("width", [1280, 390])
 def test_main_page_renders_and_tour_starts(base, width):
-    page = dom(f"{base}?tour=1&city={quote('Казань')}&goal=160", width)
+    city, goal = biggest_city_and_goal()
+    page = dom(f"{base}?tour=1&city={quote(city)}&goal={goal}", width)
     no_errors(page)
     assert 'id="app" aria-busy="false"' in page
     assert text(page, "kpi-tons").endswith("т")
     # обзор открылся на первом шаге
     assert re.search(r'class="tour-count">1 из \d+<', page)
-    # лист координатора — Казань, в таблице есть строки
-    assert "Казань" in text(page, "city-title")
+    # лист координатора — нужный город, в таблице есть строки
+    assert city in text(page, "city-title")
     city = page[page.index('id="city-table"'):]
     assert city.count("<tr") > 5
     # цель: посчитано, сколько смен добавить

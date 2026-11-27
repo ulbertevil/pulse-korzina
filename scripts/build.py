@@ -101,9 +101,11 @@ def main() -> None:
     # Список «тест / контроль» на следующую акцию: страты по прогнозу сбора
     dec = per_store.rename(columns={"pred_kg": "pred"}).reset_index(drop=True)
     st = experiment.strata(dec, "pred")
-    dec.assign(stratum=st, group=experiment.assign(dec, st))[
-        ["store_id", "city", "region", "chain", "pred", "stratum", "group"]
-    ].to_csv(rep / f"experiment_{A}_assignment.csv", index=False)
+    addr = plan_stores.drop_duplicates("store_id").set_index("store_id")["address"].map(site_export.short_address)
+    # Пример деления: перед настоящим экспериментом список пересобирается на подтверждённой таблице и фиксируется
+    dec.assign(address=dec["store_id"].map(addr), stratum=st, group=experiment.assign(dec, st))[
+        ["store_id", "city", "address", "region", "chain", "pred", "stratum", "group"]
+    ].to_csv(rep / f"experiment_{A}_assignment.csv", index=False, encoding="utf-8-sig")
     # Данные для сайта
     hw = allocate.hour_weights(hourly, b)
     pred_cur = pd.Series(per_store["pred_kg"].to_numpy(), index=per_store["store_id"].to_numpy())

@@ -11,18 +11,18 @@
   "theta": 1.1866052843344685,
   "sd_cuped_strata": 40.68133589810246,
   "mde": {
-    "raw": 0.10380721126869547,
-    "cuped": 0.06219993389319233,
-    "cuped_strata": 0.06187231215310404
+    "raw": 0.10380666358512479,
+    "cuped": 0.06219960572830404,
+    "cuped_strata": 0.0618719857167377
   },
   "stores_needed": {
     "5%": {
-      "raw": 7501,
+      "raw": 7500,
       "cuped": 2693,
       "cuped_strata": 2665
     },
     "10%": {
-      "raw": 1876,
+      "raw": 1875,
       "cuped": 674,
       "cuped_strata": 667
     },
@@ -39,9 +39,9 @@
     "n_sims": 200
   },
   "check_power_at_mde": {
-    "effect": 0.06187231215310404,
+    "effect": 0.0618719857167377,
     "reject_rate": 0.82,
-    "mean_estimate": 0.06317744317581167,
+    "mean_estimate": 0.0631771167523893,
     "n_sims": 200
   },
   "calibrated_on": "2026-11",

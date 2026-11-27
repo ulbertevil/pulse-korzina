@@ -1,5 +1,6 @@
 """Сайт считает в браузере (site/model.js) то же, что Python. Проверяем на демо-выгрузке."""
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +16,8 @@ from pulse.stores import load_table
 ROOT = Path(__file__).resolve().parents[1]
 NEXT = "2026-12-10"
 
+if os.environ.get("CI") and shutil.which("node") is None:
+    raise RuntimeError("в CI нужен Node.js — без него проверка JS-порта модели молча пропустилась бы")
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="нужен Node.js")
 
 

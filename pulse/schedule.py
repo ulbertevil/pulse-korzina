@@ -20,9 +20,11 @@ MONTHS = {
 DEFAULT_WINDOW = (15.0, 19.0)  # самое частое окно в таблице, используется как допущение
 
 _MONTH_RE = "|".join(MONTHS)
-_DAYS_RE = re.compile(rf"(?<![\d.:])(?P<days>\d{{1,2}}(?:\s*[-–,]\s*\d{{1,2}})*)\s*(?P<month>{_MONTH_RE})")
+_SEP = r"(?:\s*[-–—,]\s*|\s+и\s+)"
+_DAYS_RE = re.compile(rf"(?<![\d.:])(?P<days>\d{{1,2}}(?:{_SEP}\d{{1,2}})*)\s*(?P<month>{_MONTH_RE})")
+_RANGE_RE = re.compile(r"\d{1,2}\s*[-–—]\s*\d{1,2}")
 _TIME_RE = re.compile(
-    r"(?:с\s*)?(?P<h1>\d{1,2})(?:[.:](?P<m1>\d{2}))?\s*(?:-|–|до)\s*(?P<h2>\d{1,2})(?:[.:](?P<m2>\d{2}))?"
+    r"(?:с\s*)?(?P<h1>\d{1,2})(?:[.:](?P<m1>\d{2}))?\s*(?:-|–|—|до)\s*(?P<h2>\d{1,2})(?:[.:](?P<m2>\d{2}))?"
 )
 
 
@@ -41,9 +43,9 @@ class Slot:
 
 def _expand_days(text: str) -> list[int]:
     days: list[int] = []
-    for part in re.split(r"\s*,\s*", text.strip()):
-        if re.search(r"[-–]", part):
-            a, b = (int(x) for x in re.split(r"\s*[-–]\s*", part))
+    for part in re.split(r"\s*,\s*|\s+и\s+", text.strip()):
+        if re.search(r"[-–—]", part):
+            a, b = (int(x) for x in re.split(r"\s*[-–—]\s*", part))
             days.extend(range(a, b + 1))
         elif part:
             days.append(int(part))
@@ -67,11 +69,21 @@ def parse_schedule(raw: str) -> list[Slot]:
     matches = list(_DAYS_RE.finditer(text))
     if not matches:
         return []
-    parts: list[tuple[list[int], int, tuple[float, float] | None]] = []
+    # «20 ноября 15-19, 21 ноября 12-16»: регулярка захватывает «15-19, 21» как дни второй части.
+    # Если сразу после месяца идёт диапазон, а за ним через запятую ещё дни — диапазон это время предыдущей части.
+    spans = []  # (начало дней, конец совпадения, текст дней, месяц)
     for i, m in enumerate(matches):
-        tail_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        tail = text[m.end():tail_end]
-        parts.append((_expand_days(m["days"]), MONTHS[m["month"]], _parse_time(tail)))
+        start, days = m.start("days"), m["days"]
+        if i and not text[matches[i - 1].end():start].strip(" ,"):
+            cut = re.search(r"\s*,\s*|\s+и\s+", days)
+            if cut and _RANGE_RE.fullmatch(days[:cut.start()]):
+                start = m.start("days") + cut.end()
+                days = days[cut.end():]
+        spans.append((start, m.end(), days, MONTHS[m["month"]]))
+    parts: list[tuple[list[int], int, tuple[float, float] | None]] = []
+    for i, (_, end, days, month) in enumerate(spans):
+        tail_end = spans[i + 1][0] if i + 1 < len(spans) else len(text)
+        parts.append((_expand_days(days), month, _parse_time(text[end:tail_end])))
 
     known = [t for _, _, t in parts if t]
     slots: list[Slot] = []

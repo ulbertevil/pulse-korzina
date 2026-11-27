@@ -4,6 +4,7 @@ name: Новая акция
 # Actions → «Новая акция» → Run workflow → вставить ссылку на Google-таблицу.
 # Таблица скачивается и проверяется, прогноз, расстановка и листы координаторов
 # пересчитываются, сайт публикуется заново. Отчёт о проверке — на странице запуска.
+# Сначала можно запустить с галочкой «Только проверить»: будет отчёт, но сайт не изменится.
 
 on:
   workflow_dispatch:
@@ -14,6 +15,10 @@ on:
       year:
         description: "Год акции, если в таблице даты без года и это не ближайшая акция"
         required: false
+      dry_run:
+        description: "Только проверить таблицу, ничего не менять"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -24,6 +29,7 @@ concurrency:
 
 jobs:
   connect:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,12 +41,16 @@ jobs:
         env:
           TABLE_URL: ${{ inputs.table_url }}
           YEAR: ${{ inputs.year }}
-        run: python scripts/new_action.py --url "$TABLE_URL" ${YEAR:+--year "$YEAR"}
+          DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python scripts/new_action.py --url "$TABLE_URL" ${YEAR:+--year "$YEAR"} $DRY
       - name: Пересчитать прогноз и расстановку
+        if: ${{ !inputs.dry_run }}
         run: python scripts/build.py
       - name: Проверить тесты
+        if: ${{ !inputs.dry_run }}
         run: python -m pytest -q
       - name: Сохранить в репозиторий
+        if: ${{ !inputs.dry_run }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -49,6 +59,7 @@ jobs:
           git commit -m "Новая акция $ACTION: таблица магазинов подключена" || echo "изменений нет"
           git push
       - name: Опубликовать сайт
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run pages.yml --ref "${{ github.ref_name }}"

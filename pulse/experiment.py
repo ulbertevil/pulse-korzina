@@ -19,11 +19,9 @@ import math
 import numpy as np
 import pandas as pd
 
-Z = {0.80: 0.8416, 0.90: 1.2816, 0.95: 1.6449, 0.975: 1.9600, 0.995: 2.5758}
-
-
 def z(p: float) -> float:
-    return Z.get(round(p, 3)) or _norm_ppf(p)
+    """Квантиль нормального распределения — та же формула, что в site/app.js, чтобы README и сайт совпадали."""
+    return _norm_ppf(p)
 
 
 def _norm_ppf(p: float) -> float:

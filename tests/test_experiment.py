@@ -19,8 +19,9 @@ def stores():
 
 
 def test_norm_ppf_matches_table():
-    for p, v in ex.Z.items():
-        assert ex._norm_ppf(p) == pytest.approx(v, abs=1e-3)
+    table = {0.80: 0.841621, 0.90: 1.281552, 0.95: 1.644854, 0.975: 1.959964, 0.995: 2.575829}
+    for p, v in table.items():
+        assert ex.z(p) == pytest.approx(v, abs=1e-6)
 
 
 def test_mde_and_sample_size_are_inverse():
