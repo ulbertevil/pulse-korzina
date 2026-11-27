@@ -72,7 +72,9 @@ def slot_table(plan: pd.DataFrame, pred0: pd.Series, weights: pd.Series, stores:
                                            end=("hour", "max"), base_kg=("base_kg", "sum")).reset_index()
     s["end"] += 1
     s["day_index"] = s.groupby("store_id")["date"].rank(method="dense").astype(int)
-    return s.merge(stores[["store_id", "city", "region", "chain", "address"]], on="store_id", how="left")
+    # смены переставляются внутри населённого пункта (locality), а не внутри «Краснодарского края» из колонки «Город»
+    st = stores.assign(city=stores["locality"]) if "locality" in stores else stores
+    return s.merge(st[["store_id", "city", "region", "chain", "address"]], on="store_id", how="left")
 
 
 def gains(slots: pd.DataFrame, b: np.ndarray) -> pd.DataFrame:

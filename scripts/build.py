@@ -114,7 +114,7 @@ def main() -> None:
                              res, summ, preds, des, ROOT / "data/facts.csv")
     # регионы и города в таблице записаны по-разному («Калужская обл.» и «калужская обл.») — считаем без регистра и точек
     uniq = lambda c: int(plan_stores[c].str.lower().str.replace(".", "", regex=False).str.strip().nunique())  # noqa: E731
-    site["meta"].update({"regions": uniq("region"), "cities": uniq("city"),
+    site["meta"].update({"regions": uniq("region"), "cities": uniq("locality"),
                          "table_connected": bool(NEXT.get("table")), "next_source": NEXT.get("source_url")})
     if NEXT.get("table") and "docs.google.com" in NEXT.get("source_url", ""):
         site["meta"]["source_table"] = NEXT["source_url"]

@@ -57,6 +57,9 @@ def shoot(base: str, query: str, width: int, out: Path) -> None:
                         "--virtual-time-budget=15000", f"--screenshot={out}", f"{base}?{query}"],
                        check=True, capture_output=True, timeout=180)
     trim(out)
+    if width < 600:  # на телефоне лист длинный: оставляем верх и первые карточки
+        im = Image.open(out)
+        im.crop((0, 0, im.width, min(im.height, 4200))).save(out, optimize=True)
 
 
 def font(size: int):

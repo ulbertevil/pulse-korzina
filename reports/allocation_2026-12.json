@@ -4,12 +4,12 @@
   "kg": {
     "none": 97522.40828619215,
     "current": 138063.7561986983,
-    "uniform": 145889.10680915407,
-    "opt": 149760.38384565525
+    "uniform": 145674.1203317932,
+    "opt": 149379.62290121196
   },
-  "uplift_opt_vs_current": 0.08471903104043776,
-  "uplift_opt_vs_uniform": 0.026535751168628607,
-  "kg_per_shift_opt": 12.416918364502758,
+  "uplift_opt_vs_current": 0.08196116789860564,
+  "uplift_opt_vs_uniform": 0.025436931151387343,
+  "kg_per_shift_opt": 12.32641184098403,
   "kg_per_shift_current": 9.636640815903531,
   "vol_coef": [
     0.3791,

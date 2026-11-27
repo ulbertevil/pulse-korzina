@@ -7,6 +7,13 @@ const pct = (x, d = 1) => (x == null ? "—" : nf(d).format(x * 100) + "%");
 const signedPct = (x, d = 1) => (x > 0 ? "+" : x < 0 ? "−" : "") + nf(d).format(Math.abs(x) * 100) + "%";
 const tons = (kg, d = 1) => fmt(kg / 1000, d) + " т";
 const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+/** CSV для русского Excel: разделитель «;», десятичная запятая, BOM — открывается двойным щелчком без мастера импорта. */
+const excelCell = (v) => {
+  const t = typeof v === "number" ? String(v).replace(".", ",") : String(v ?? "");
+  return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+};
+const excelCsv = (head, rows) => "\ufeff" + [head, ...rows].map((r) => r.map(excelCell).join(";")).join("\r\n");
+const csvUrlOf = (head, rows) => URL.createObjectURL(new Blob([excelCsv(head, rows)], { type: "text/csv;charset=utf-8" }));
 const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 const dateLabel = (iso) => { const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
 const dateShort = (iso) => { const d = new Date(iso + "T00:00:00"); return `${WD[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`; };
@@ -51,7 +58,7 @@ function table(container, cols, rows) {
   rows.forEach((r) => {
     const row = el("tr");
     cols.forEach((c) => {
-      const td = el("td", { class: c.num ? "num" : "" });
+      const td = el("td", { class: c.num ? "num" : "", "data-label": c.title });
       const v = c.render ? c.render(r) : r[c.key];
       if (v instanceof Node) td.append(v); else td.textContent = v ?? "";
       row.append(td);
@@ -422,7 +429,7 @@ function render(D) {
   $("ab-check").textContent = `Проверено 200 раз на последней синтетической акции: когда эффекта нет, эксперимент ошибочно «находит» его в ${pct(E.aa, 0)} случаев (допустимо 5%); `
     + `когда эффект равен минимальному заметному, находит его в ${pct(E.power_at_mde, 0)} случаев (цель 80%). `
     + "Разброс сборов и то, насколько прогноз его объясняет, взяты из синтетики: на настоящей выгрузке нужное число магазинов будет другим. "
-    + "Эффект перестановки волонтёров по модели — от +2,7% до +8,5%, это на границе того, что видно за одну акцию: надёжнее проверять на двух акциях подряд.";
+    + `Эффект перестановки волонтёров по модели — от ${signedPct(D.kpi.uplift_vs_uniform)} до ${signedPct(D.kpi.uplift_vs_current)}, это на границе того, что видно за одну акцию: надёжнее проверять на двух акциях подряд.`;
   $("dl-assign").href = "data/experiment_assignment.csv";
 
   // факты
@@ -455,10 +462,8 @@ fetch("data/dashboard.json")
   const status = $("up-status"), demoBtn = $("demo-btn"), drop = $("drop"), fileInput = $("file");
   let worker = null, urls = [];
   const say = (text, err = false) => { status.textContent = text; status.classList.toggle("err", err); };
-  const csvCell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
   const csvBlob = (cols, rows) => {
-    const text = [cols.map((c) => c[0]).join(",")].concat(rows.map((r) => cols.map((c) => csvCell(c[1](r))).join(","))).join("\n");
-    const u = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+    const u = csvUrlOf(cols.map((c) => c[0]), rows.map((r) => cols.map((c) => c[1](r))));
     urls.push(u);
     return u;
   };
@@ -569,7 +574,17 @@ fetch("data/dashboard.json")
   const readFile = (f) => {
     if (!f) return;
     if (f.size > 50 * 1024 * 1024) { say("Файл больше 50 МБ — сократите период или число колонок.", true); return; }
-    f.text().then((t) => run(t, `файл «${f.name}»`), (e) => say(`Не удалось прочитать файл: ${e.message}`, true));
+    if (/\.(xlsx?|ods)$/i.test(f.name)) {
+      say("Это файл Excel. Откройте его и сохраните как «CSV (разделители — запятые или точка с запятой)», затем загрузите CSV.", true);
+      return;
+    }
+    // CSV из русского Excel обычно в кодировке Windows-1251: пробуем UTF-8, при ошибке — 1251
+    f.arrayBuffer().then((buf) => {
+      let t, enc = "";
+      try { t = new TextDecoder("utf-8", { fatal: true }).decode(buf); }
+      catch { t = new TextDecoder("windows-1251").decode(buf); enc = ", кодировка Windows-1251"; }
+      run(t, `файл «${f.name}»${enc}`);
+    }, (e) => say(`Не удалось прочитать файл: ${e.message}`, true));
   };
   fileInput.addEventListener("change", () => readFile(fileInput.files[0]));
   ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
@@ -592,7 +607,7 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
   const input = $("city-input"), daySel = $("city-day"), status = $("city-status");
   let rows = [], cities = new Map(), byNorm = new Map(), csvUrl = null, dates = [];
   let current = null, demo = false, tableOk = true;
-  const norm = (x) => String(x || "").toLowerCase().replace(/ё/g, "е").replace(/[\s,]+(г|город)\.?$/, "").replace(/\s+/g, " ").trim();
+  const norm = (x) => String(x || "").toLowerCase().replace(/ё/g, "е").replace(/[\s,]+(г|город|с|село|п|пгт|рп|сп|д|ст-ца|станица|сл|х)\.?$/, "").replace(/\s+/g, " ").trim();
   const resolve = (x) => (cities.has(x) ? x : byNorm.get(norm(x)));
   const store = { get: () => { try { return localStorage.getItem("pulse.city"); } catch { return null; } },
     set: (v) => { try { localStorage.setItem("pulse.city", v); } catch { /* приватный режим */ } } };
@@ -631,10 +646,8 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
       if (i > 0 && list[i].date !== list[i - 1].date) tr.classList.add("day-break");
     });
     if (csvUrl) URL.revokeObjectURL(csvUrl);
-    const cell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
     const head = ["город", "дата", "начало", "конец", "магазин", "сеть", "людей_было", "людей_надо", "ожидаем_кг", "тара_до_кг"];
-    const body = list.map((r) => [city, r.date, r.start, r.end, r.address, r.chain, r.v_current, r.v_opt, r.kg_opt, r.hi80].map(cell).join(","));
-    csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
+    csvUrl = csvUrlOf(head, list.map((r) => [city, r.date, r.start, r.end, r.address, r.chain, r.v_current, r.v_opt, r.kg_opt, r.hi80]));
     const a = $("city-csv"); a.href = csvUrl; a.download = `${demo ? "ДЕМО_" : ""}план_${city.replace(/[^\p{L}\d-]+/gu, "_")}_${day || dates.join("_")}.csv`;
     $("city-sheet").hidden = false;
     current = { city, list, day };
@@ -800,11 +813,10 @@ const coordData = fetch("data/coordinator.json").then((r) => { if (!r.ok) throw 
       { title: "+ кг", num: true, render: (r) => fmt(r.kg) },
     ], list.slice(0, 12));
     if (csvUrl) URL.revokeObjectURL(csvUrl);
-    const cell = (v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
     const head = ["город", "дата", "начало", "конец", "магазин", "сеть", "людей_по_рекомендации", "людей_с_новыми", "прибавка_кг"];
     const body = [...add.entries()].sort((a, b) => a[0] - b[0]).map(([ri, a]) => { const r = rows[ri];
-      return [r.city, r.date, r.start, r.end, r.address, r.chain, r.v_opt, r.v_opt + a.n, a.kg.toFixed(1)].map(cell).join(","); });
-    csvUrl = URL.createObjectURL(new Blob(["﻿" + [head.join(","), ...body].join("\n")], { type: "text/csv;charset=utf-8" }));
+      return [r.city, r.date, r.start, r.end, r.address, r.chain, r.v_opt, r.v_opt + a.n, Math.round(a.kg * 10) / 10]; });
+    csvUrl = csvUrlOf(head, body);
     $("goal-csv").href = csvUrl; $("goal-csv").download = `${G.synthetic ? "ДЕМО_" : ""}новые_смены_цель_${goalT}т.csv`;
   }
 

@@ -115,7 +115,18 @@ def write(out_dir: Path, data: dict, csv_files: dict[str, Path]) -> None:
     (out_dir / "dashboard.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")),
                                             encoding="utf-8")
     for name, src in csv_files.items():
-        (out_dir / name).write_bytes(src.read_bytes())
+        if name in MACHINE_CSV:
+            (out_dir / name).write_bytes(src.read_bytes())
+        else:  # файлы для скачивания — так, чтобы русский Excel открыл их двойным щелчком
+            excel_csv(pd.read_csv(src, dtype={"store_id": str}), out_dir / name)
+
+
+MACHINE_CSV = {"demo_export.csv"}  # его читает сам сайт; остальные CSV — для людей
+
+
+def excel_csv(df: pd.DataFrame, path: Path) -> None:
+    """CSV для русского Excel: «;», десятичная запятая, UTF-8 с BOM."""
+    df.to_csv(path, sep=";", decimal=",", float_format="%.6g", index=False, encoding="utf-8-sig")
 
 
 COORD_FIELDS = ["city", "address", "chain", "date", "start", "end", "v_current", "v_opt", "kg_current", "kg_opt", "hi80"]

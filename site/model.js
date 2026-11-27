@@ -72,10 +72,20 @@
   function parseDate(v) {
     const s = String(v).trim();
     let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    if (m) return okDate(+m[1], +m[2], +m[3]);
     m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
-    if (m) { const y = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return Date.UTC(y, +m[2] - 1, +m[1]); }
+    if (m) { const y = +m[3] < 100 ? 2000 + +m[3] : +m[3]; return okDate(y, +m[2], +m[1]); }
     return NaN;
+  }
+  /** Дата существует: 31.02 или месяц 13 (американский порядок «12/31») — не дата, строка пропускается с причиной. */
+  function okDate(y, mo, d) {
+    const t = Date.UTC(y, mo - 1, d);
+    return mo >= 1 && mo <= 12 && new Date(t).getUTCDate() === d ? t : NaN;
+  }
+  /** Час: «16», «16:00», «16:30» → 16, 16, 16.5. */
+  function parseHour(v) {
+    const m = String(v ?? "").trim().match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?$/);
+    return m ? +m[1] + +m[2] / 60 : parseNum(v);
   }
   const iso = (t) => new Date(t).toISOString().slice(0, 10);
 
@@ -96,7 +106,7 @@
       if (Number.isNaN(date)) { skip("дата не распознана"); continue; }
       if (Number.isNaN(kg) || kg < 0) { skip("кг не число"); continue; }
       let hours = NaN;
-      if ("start" in col && "end" in col) hours = parseNum(r[col.end]) - parseNum(r[col.start]);
+      if ("start" in col && "end" in col) hours = parseHour(r[col.end]) - parseHour(r[col.start]);
       else if ("hours" in col) hours = parseNum(r[col.hours]);
       records.push({
         store, date, kg, hours: hours > 0 ? hours : DEFAULT_HOURS,

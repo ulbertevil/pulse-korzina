@@ -116,6 +116,22 @@ h3 { font-size: 17px; margin: 0; }
 .table-view summary { cursor: pointer; color: var(--ink-2); }
 .scroll { overflow-x: auto; }
 .scroll.tall { max-height: 520px; overflow-y: auto; }
+/* Лист координатора на телефоне: каждая точка — карточка, без прокрутки вбок и внутри прокрутки */
+@media (max-width: 600px) {
+  #city-table.scroll.tall { max-height: none; overflow: visible; }
+  #city-table table, #city-table tbody, #city-table td { display: block; width: 100%; }
+  #city-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #city-table tr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+  #city-table tr.day-break { border-top: 2px solid var(--border); }
+  #city-table td { border: 0; padding: 2px 0; text-align: left; white-space: normal; }
+  #city-table td::before { content: attr(data-label); display: block; font-size: 12px; color: var(--muted); }
+  #city-table td[data-label="Магазин"] { grid-column: 1 / -1; order: -1; font-weight: 600; }
+  #city-table td[data-label="Магазин"]::before, #city-table td[data-label="День"]::before, #city-table td[data-label="Часы"]::before { display: none; }
+  #city-table td[data-label="День"], #city-table td[data-label="Часы"] { order: -1; color: var(--ink-2); }
+  #city-table td[data-label="День"] + td[data-label="Часы"] { grid-column: span 2; }
+  #city-table td[data-label^="Людей"]::before { content: "Людей"; }
+  #city-table td[data-label^="Людей"] { font-weight: 600; }
+}
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
 th { color: var(--ink-2); font-weight: 500; position: sticky; top: 0; background: var(--surface); }

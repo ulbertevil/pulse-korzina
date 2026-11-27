@@ -93,33 +93,33 @@
     },
     {
       "scale": 0.5,
-      "kg_opt": 142684.41692,
+      "kg_opt": 142529.47454,
       "kg_current": 138063.7562,
-      "kg_uniform": 140972.96117,
-      "kg_oracle": 142782.03795,
-      "uplift_vs_current": 0.03347,
-      "uplift_vs_uniform": 0.01214,
+      "kg_uniform": 140896.58815,
+      "kg_oracle": 142626.78385,
+      "uplift_vs_current": 0.03235,
+      "uplift_vs_uniform": 0.01159,
       "regret": 0.00068
     },
     {
       "scale": 1.0,
-      "kg_opt": 149760.38385,
+      "kg_opt": 149379.6229,
       "kg_current": 138063.7562,
-      "kg_uniform": 145889.10681,
-      "kg_oracle": 149760.38385,
-      "uplift_vs_current": 0.08472,
-      "uplift_vs_uniform": 0.02654,
+      "kg_uniform": 145674.12033,
+      "kg_oracle": 149379.6229,
+      "uplift_vs_current": 0.08196,
+      "uplift_vs_uniform": 0.02544,
       "regret": 0.0
     },
     {
       "scale": 2.0,
-      "kg_opt": 173380.06798,
+      "kg_opt": 172270.44892,
       "kg_current": 138063.7562,
-      "kg_uniform": 163343.58603,
-      "kg_oracle": 176289.53499,
-      "uplift_vs_current": 0.2558,
-      "uplift_vs_uniform": 0.06144,
-      "regret": 0.0165
+      "kg_uniform": 162608.81109,
+      "kg_oracle": 175051.62213,
+      "uplift_vs_current": 0.24776,
+      "uplift_vs_uniform": 0.05942,
+      "regret": 0.01589
     }
   ],
   "stress": [

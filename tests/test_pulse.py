@@ -138,3 +138,23 @@ def test_facts_csv_is_valid():
         rec = dict(zip(header, r))
         assert rec["status"] in status, rec["id"]
         assert rec["source_url"].startswith("https://"), rec["id"]
+
+
+@pytest.mark.parametrize("city, address, want", [
+    ("Казань г", "420000, Татарстан респ., Казань г, Ленина ул., Дом 1", "Казань г"),
+    ("Краснодарский край", "352033, Краснодарский край, Кущевский р-н, Кущевская ст-ца, Карьерная ул., Дом 29", "Кущевская ст-ца"),
+    ("Нижегородская обл.", "603018, Нижегородская обл., Нижний Новгород г., Аркадия Гайдара ул., Дом 24", "Нижний Новгород г."),
+    ("Нижегородская обл.", "606083, Нижегородская обл., Володарский р-н, Мулино сп., Новая ул., Дом 26", "Мулино сп."),
+    ("Тамбовская обл.", "392525, Тамбовская обл., Строитель п., Южный мкр., Дом 9В", "Строитель п."),
+    ("Краснодарский край", "Краснодарский край, Ленина ул., 1", "Краснодарский край"),  # пункта в адресе нет — оставляем как есть
+])
+def test_locality_from_address_when_city_column_holds_region(city, address, want):
+    from pulse.stores import locality_of
+    assert locality_of(city, address) == want
+
+
+def test_every_store_gets_a_locality_not_a_region():
+    stores, _ = load_table(RAW, 2026)
+    assert not stores["locality"].str.contains(r"(?:край|обл\.?|респ\.?)$", regex=True).any()
+    norm = lambda s: s.str.lower().str.replace(".", "", regex=False).str.strip()  # noqa: E731
+    assert (norm(stores["city"]) != norm(stores["locality"])).sum() == 146  # столько строк с регионом в «Городе»
