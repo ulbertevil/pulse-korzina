@@ -185,3 +185,7 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 Таблица магазинов акции — открытая таблица фонда «Выручаем»: https://docs.google.com/spreadsheets/d/1EN_UUkJ4GrCLz2ytDwNJYG4o2xCyVzXEkNijITP6Z3w/ (скачана 26.11.2026, `data/raw/`).
 
 Работа началась 26.11.2026 в Claude Code.
+
+## Лицензия
+
+Код — MIT (`LICENSE`): фонд и кто угодно может использовать, менять и размещать его у себя. Таблица магазинов в `data/raw/` — открытые данные фонда «Выручаем», лицензия кода на неё не распространяется.
